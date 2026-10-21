@@ -13,6 +13,8 @@ import android.widget.Toast
  * JS 与原生之间的桥。
  * - onSessionChanged：网页里开始/结束计时时，把状态写给小组件读的 SharedPreferences
  * - exportCsv：把 CSV 写进系统「下载」目录，可选直接拉起分享（微信）
+ *
+ * 注意：所有对外方法都必须标 @JavascriptInterface，否则新版 WebView 不会暴露给 JS。
  */
 class Bridge(private val ctx: Context) {
 
@@ -31,7 +33,7 @@ class Bridge(private val ctx: Context) {
     fun exportCsv(content: String, filename: String, wantShare: Int) {
         val uri = saveToDownloads(content, filename)
         if (uri == null) {
-            Toast.makeText(ctx, "导出失败，请重试", Toast.LENGTH_SHORT).show()
+            toast("导出失败，请重试")
             return
         }
         if (wantShare == 1) {
@@ -44,11 +46,16 @@ class Bridge(private val ctx: Context) {
             try {
                 ctx.startActivity(Intent.createChooser(share, "分享喂奶记录"))
             } catch (e: Exception) {
-                Toast.makeText(ctx, "已保存到「下载」目录", Toast.LENGTH_LONG).show()
+                toast("已保存到「下载」目录")
             }
         } else {
-            Toast.makeText(ctx, "已保存到「下载」目录：$filename", Toast.LENGTH_LONG).show()
+            toast("已保存到「下载」目录：$filename")
         }
+    }
+
+    /** 供 MainActivity 的下载监听复用 */
+    fun saveFromDownload(content: String, filename: String): Boolean {
+        return saveToDownloads(content, filename) != null
     }
 
     private fun saveToDownloads(content: String, filename: String): Uri? {
@@ -71,6 +78,14 @@ class Bridge(private val ctx: Context) {
             uri
         } catch (e: Exception) {
             null
+        }
+    }
+
+    /** 必须切回主线程才能弹 Toast / 分享 */
+    private fun toast(msg: String) {
+        val act = ctx as? MainActivity
+        if (act != null) {
+            act.runOnUiThread { Toast.makeText(act, msg, Toast.LENGTH_LONG).show() }
         }
     }
 
