@@ -121,16 +121,20 @@ header{
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
 .cal-w{text-align:center;font-size:11px;color:var(--muted);padding:6px 0;}
 .cal-d{
-  aspect-ratio:1/1;border-radius:12px;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;font-size:14px;position:relative;
+  /* 不用 aspect-ratio：部分小米 WebView 内核不支持，会退化成撑满整格 */
+  height:auto;min-height:44px;padding:4px 0 3px;width:100%;
+  border-radius:12px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;font-size:14px;line-height:1.15;position:relative;
   border:none;background:transparent;font-family:inherit;color:var(--text);
+  -webkit-appearance:none;appearance:none;box-shadow:none;margin:0;
 }
+.cal-d .dnum{display:block;font-size:14px;}
 .cal-d.other{color:#D8CFC9;}
 .cal-d.today{font-weight:700;color:var(--pink);}
 .cal-d.sel{background:var(--pink);color:#fff;font-weight:700;}
 .cal-d.sel .dots i{background:#fff !important;}
-.dots{display:flex;gap:2px;height:5px;margin-top:2px;}
-.dots i{width:5px;height:5px;border-radius:50%;display:block;}
+.dots{display:flex;gap:2px;height:5px;margin-top:2px;align-items:center;justify-content:center;line-height:0;}
+.dots i,.dots span{width:5px;height:5px;border-radius:50%;display:block;}
 
 /* ---------- 记录条目 ---------- */
 .rec{
@@ -314,7 +318,7 @@ header{
   </div>
 
   <div class="card">
-    <div class="card-title"><span>导出</span></div>
+    <div class="card-title"><span id="exportHead">导出</span></div>
     <div style="font-size:12px;color:var(--muted);margin:6px 0 12px;">
       把所有记录导出为 CSV 表格，可用 Excel / WPS /  Numbers 打开，也可直接分享到微信。
     </div>
@@ -496,6 +500,9 @@ function fmtDurText(s){
   return Math.floor(m/60)+' 小时 '+pad(m%60)+' 分';
 }
 /* 原生桥：装进 APK 后，把"正在计时"的状态同步给桌面小组件；网页版里 window.Android 不存在，直接跳过 */
+function hasBridge(){
+  try{return !!(window.Android&&window.Android.exportCsv);}catch(e){return false;}
+}
 function syncNative(){
   try{
     if(window.Android&&window.Android.onSessionChanged){
@@ -699,7 +706,7 @@ function renderHeader(){
   var el=document.getElementById('hStat');
   if(!last){el.innerHTML='暂无喂养记录';return;}
   var gap=Math.floor((Date.now()-last.start)/60000);
-  var txt=gap<60?gap+' 分钟前':Math.floor(gap/60)+' 小时'+pad(gap%60)+'分前';
+  var txt=gap<60?gap+' 分钟前':Math.floor(gap/60)+' 小时 '+pad(gap%60)+' 分前';
   el.innerHTML='上次喂养<br><b>'+txt+'</b>';
 }
 function renderButtons(){
@@ -804,20 +811,21 @@ function renderCal(){
   var prevDays=new Date(viewY,viewM,0).getDate();
   var html='';
   for(var i=0;i<offset;i++){
-    html+='<div class="cal-d other">'+(prevDays-offset+i+1)+'</div>';
+    html+='<div class="cal-d other"><span class="dnum">'+(prevDays-offset+i+1)+'</span></div>';
   }
   var todayStr=dstr(new Date());
   for(var d=1;d<=days;d++){
     var ds=viewY+'-'+pad(viewM+1)+'-'+pad(d);
     var c=countDay(ds);
-    var dots='';
-    if(c.breast)dots+='<i style="background:#F2729B"></i>';
-    if(c.pump)dots+='<i style="background:#9B7BE8"></i>';
-    if(c.bottleMl)dots+='<i style="background:#4E9BE0"></i>';
-    if(c.poop)dots+='<i style="background:#C0895C"></i>';
+    var dots=[];
+    if(c.breast)dots.push('<span style="background:#F2729B"></span>');
+    if(c.pump)dots.push('<span style="background:#9B7BE8"></span>');
+    if(c.bottleMl)dots.push('<span style="background:#4E9BE0"></span>');
+    if(c.poop)dots.push('<span style="background:#C0895C"></span>');
     var cls='cal-d'+(ds===todayStr?' today':'')+(ds===selDate?' sel':'');
-    html+='<button class="'+cls+'" onclick="pickDate(\''+ds+'\')">'+d+
-      '<span class="dots">'+dots.slice(0,4)+'</span></button>';
+    html+='<button type="button" class="'+cls+'" onclick="pickDate(\''+ds+'\')">'+
+      '<span class="dnum">'+d+'</span>'+
+      '<span class="dots">'+dots.join('')+'</span></button>';
   }
   document.getElementById('calDays').innerHTML=html;
   document.getElementById('calMonth').textContent=viewY+'年'+(viewM+1)+'月';
@@ -869,27 +877,54 @@ function buildCSV(){
 function exportCSV(){
   if(!records.length){toast('还没有记录可导出');return;}
   var fn='喂奶记录_'+dstr(new Date())+'.csv';
-  if(nativeExport(buildCSV(),fn,false)){toast('已保存 '+records.length+' 条到「下载」目录');return;}
-  var blob=new Blob([buildCSV()],{type:'text/csv;charset=utf-8'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url;a.download=fn;
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  setTimeout(function(){URL.revokeObjectURL(url);},1000);
-  toast('已导出 '+records.length+' 条，保存到「下载」目录');
+  var csv=buildCSV();
+  if(nativeExport(csv,fn,false)){toast('已保存 '+records.length+' 条到「下载」目录');return;}
+  // 网页版：走 Blob 下载
+  try{
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=fn;a.rel='noopener';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},1500);
+    toast('已导出 '+records.length+' 条');
+  }catch(e){
+    // 最后兜底：整段 CSV 塞进弹窗供长按复制
+    showTextArea(fn,csv);
+  }
 }
 function shareCSV(){
   if(!records.length){toast('还没有记录可导出');return;}
   var fn='喂奶记录_'+dstr(new Date())+'.csv';
-  if(nativeExport(buildCSV(),fn,true))return;
-  var blob=new Blob([buildCSV()],{type:'text/csv;charset=utf-8'});
-  var file=new File([blob],fn,{type:'text/csv'});
-  if(navigator.canShare&&navigator.canShare({files:[file]})){
-    navigator.share({files:[file],title:'喂奶记录'}).catch(function(){exportCSV();});
-  }else{
-    toast('当前浏览器不支持直接分享，已改为下载');
-    exportCSV();
-  }
+  var csv=buildCSV();
+  if(nativeExport(csv,fn,true))return;
+  try{
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    var file=new File([blob],fn,{type:'text/csv'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:'喂奶记录'}).catch(function(){exportCSV();});
+      return;
+    }
+  }catch(e){}
+  toast('当前环境不支持直接分享，已改为导出文件');
+  exportCSV();
+}
+/* 兜底：把 CSV 明文放进可选中复制的地方，长按全选即可粘贴到微信 */
+function showTextArea(fn,csv){
+  var old=document.getElementById('csvBox');
+  if(old)old.parentNode.removeChild(old);
+  var box=document.createElement('div');
+  box.id='csvBox';
+  box.className='mask show';
+  box.innerHTML='<div class="sheet"><h3>复制表格内容</h3>'+
+    '<div class="sub">'+fn+' · 长按下面的文字全选复制即可</div>'+
+    '<textarea readonly style="width:100%;height:40vh;border:1.5px solid var(--line);'+
+    'border-radius:14px;padding:10px;font-size:12px;font-family:monospace;"></textarea>'+
+    '<div class="sheet-btns"><button class="btn primary" onclick="document.getElementById(\'csvBox\').parentNode.removeChild(document.getElementById(\'csvBox\'))">关闭</button></div></div>';
+  document.body.appendChild(box);
+  var ta=box.querySelector('textarea');
+  ta.value=csv;
+  ta.focus();
 }
 
 /* ================= 弹层 / 导航 ================= */
@@ -909,8 +944,34 @@ function go(p){
 }
 function setAmount(v){document.getElementById('bottleAmount').value=v;}
 
+/* 诊断：长按「导出」这个标题 3 秒，弹出运行环境信息，方便排查导出为什么没反应 */
+function bindDiag(){
+  var el=document.getElementById('exportHead');
+  if(!el)return;
+  var t=null;
+  el.addEventListener('touchstart',function(){t=setTimeout(showDiag,900);},{passive:true});
+  el.addEventListener('touchend',function(){if(t)clearTimeout(t);});
+  el.addEventListener('mousedown',function(){t=setTimeout(showDiag,900);});
+  el.addEventListener('mouseup',function(){if(t)clearTimeout(t);});
+}
+function showDiag(){
+  var ua=navigator.userAgent||'';
+  var m=ua.match(/Chrome\/([\d.]+)/);
+  var lines=[
+    '是否 APK 内运行：'+(ua.indexOf('; wv')>=0?'是':'否（浏览器）'),
+    'Android 版本：'+((ua.match(/Android ([\d.]+)/)||[])[1]||'未知'),
+    'WebView 内核：'+(m?('Chromium '+m[1]):'未知'),
+    '原生桥 Android：'+(window.Android?'已注入':'未注入'),
+    '  其中 exportCsv：'+(hasBridge()?'可用':'缺失'),
+    '记录条数：'+records.length,
+    '存储可用：'+(LS_OK?'是':'否'),
+    '当前地址：'+location.href.slice(0,80)
+  ];
+  alert('运行环境\n\n'+lines.join('\n')+'\n\n'+ua.slice(0,220));
+}
+
 /* ================= 启动 ================= */
-load();initCal();renderAll();syncNative();
+load();initCal();renderAll();syncNative();bindDiag();
 ['btnBreast','btnPump','btnBottle'].forEach(function(id){
   bindLongPress(document.getElementById(id),discardActive);
 });
