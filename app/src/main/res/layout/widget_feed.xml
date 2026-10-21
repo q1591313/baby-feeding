@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wg_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="10dp"
+    android:background="@drawable/widget_bg">
+
+    <!-- 空闲态：两个快捷入口 -->
+    <LinearLayout
+        android:id="@+id/wg_idle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/wg_btn_breast"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:gravity="center"
+            android:text="亲喂"
+            android:textColor="#D94E7C"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:background="@drawable/pill_pink" />
+
+        <TextView
+            android:id="@+id/wg_btn_pump"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:gravity="center"
+            android:text="吸奶"
+            android:textColor="#7B57CC"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:background="@drawable/pill_purple" />
+    </LinearLayout>
+
+    <!-- 计时中 -->
+    <LinearLayout
+        android:id="@+id/wg_running"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/wg_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="亲喂中"
+            android:textColor="#2E2A28"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Chronometer
+            android:id="@+id/wg_chron"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:textColor="#F2729B"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/wg_end"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="结束"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:background="@drawable/pill_end" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFF7F3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>喂奶记录</title>
+<style>
+:root{
+  --bg:#FFF7F3;
+  --card:#FFFFFF;
+  --text:#2E2A28;
+  --muted:#9A908B;
+  --line:#F0E8E3;
+  --pink:#F2729B;      --pink-bg:#FFEDF3;
+  --purple:#9B7BE8;    --purple-bg:#F2EDFF;
+  --blue:#4E9BE0;      --blue-bg:#E9F3FC;
+  --brown:#C0895C;     --brown-bg:#F8F0E8;
+  --gray:#8A827E;      --gray-bg:#F3F0EE;
+  --shadow:0 4px 16px rgba(120,90,80,.08);
+  --radius:20px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Miui","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.5;
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  -webkit-font-smoothing:antialiased;
+}
+/* ---------- 顶部 ---------- */
+header{
+  padding:calc(14px + env(safe-area-inset-top)) 18px 12px;
+  display:flex;align-items:flex-end;justify-content:space-between;
+}
+.h-title{font-size:22px;font-weight:700;letter-spacing:.5px;}
+.h-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.h-stat{
+  text-align:right;font-size:12px;color:var(--muted);line-height:1.4;
+}
+.h-stat b{color:var(--pink);font-size:15px;}
+
+/* ---------- 今日概览 ---------- */
+.overview{
+  margin:0 14px 14px;background:var(--card);border-radius:var(--radius);
+  box-shadow:var(--shadow);display:flex;text-align:center;padding:14px 0;
+}
+.ov-item{flex:1;border-right:1px solid var(--line);}
+.ov-item:last-child{border-right:none;}
+.ov-num{font-size:19px;font-weight:700;}
+.ov-num.pink{color:var(--pink);}
+.ov-num.purple{color:var(--purple);}
+.ov-num.blue{color:var(--blue);}
+.ov-num.brown{color:var(--brown);}
+.ov-label{font-size:11px;color:var(--muted);margin-top:3px;}
+
+/* ---------- 页面 ---------- */
+.page{display:none;padding:0 14px;}
+.page.active{display:block;}
+
+/* ---------- 大按钮 ---------- */
+.big-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.big-btn{
+  border:none;border-radius:24px;padding:26px 12px 22px;
+  background:var(--card);box-shadow:var(--shadow);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:132px;transition:transform .12s, box-shadow .12s;position:relative;overflow:hidden;
+  font-family:inherit;color:var(--text);
+}
+.big-btn:active{transform:scale(.97);}
+.big-btn .icon{font-size:34px;line-height:1;}
+.big-btn .name{font-size:19px;font-weight:700;margin-top:10px;}
+.big-btn .timer{font-size:15px;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums;}
+.big-btn .hint{font-size:11px;color:var(--muted);margin-top:6px;}
+.big-btn.running{
+  box-shadow:0 0 0 3px rgba(242,114,155,.35), var(--shadow);
+  animation:pulse 2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(242,114,155,.30),var(--shadow);}50%{box-shadow:0 0 0 7px rgba(242,114,155,.10),var(--shadow);}}
+.big-btn.running.pump{animation:pulseP 2s ease-in-out infinite;}
+@keyframes pulseP{0%,100%{box-shadow:0 0 0 3px rgba(155,123,232,.30),var(--shadow);}50%{box-shadow:0 0 0 7px rgba(155,123,232,.10),var(--shadow);}}
+.big-btn.running.bottle{animation:pulseB 2s ease-in-out infinite;}
+@keyframes pulseB{0%,100%{box-shadow:0 0 0 3px rgba(78,155,224,.30),var(--shadow);}50%{box-shadow:0 0 0 7px rgba(78,155,224,.10),var(--shadow);}}
+.big-btn.disabled{opacity:.42;}
+.tag-side{
+  position:absolute;top:10px;right:10px;font-size:11px;font-weight:600;
+  padding:3px 9px;border-radius:20px;background:var(--pink-bg);color:var(--pink);
+}
+.tag-side.pump{background:var(--purple-bg);color:var(--purple);}
+.tag-side.bottle{background:var(--blue-bg);color:var(--blue);}
+
+/* ---------- 小按钮 ---------- */
+.small-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px;}
+.small-btn{
+  border:none;border-radius:18px;padding:16px 6px 14px;background:var(--card);
+  box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;
+  font-family:inherit;color:var(--text);transition:transform .12s;min-height:96px;position:relative;
+}
+.small-btn:active{transform:scale(.97);}
+.small-btn .icon{font-size:26px;line-height:1;}
+.small-btn .name{font-size:14px;font-weight:600;margin-top:8px;}
+.small-btn .timer{font-size:13px;font-weight:600;color:var(--blue);margin-top:4px;font-variant-numeric:tabular-nums;}
+.small-btn.running{box-shadow:0 0 0 3px rgba(78,155,224,.3),var(--shadow);}
+.small-btn.disabled{opacity:.42;}
+
+/* ---------- 卡片列表 ---------- */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;margin-top:14px;}
+.card-title{font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+.card-title .more{font-size:12px;color:var(--muted);font-weight:400;}
+
+/* ---------- 日历 ---------- */
+.cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.cal-month{font-size:17px;font-weight:700;}
+.cal-nav{display:flex;gap:6px;}
+.cal-nav button{
+  border:none;background:var(--card);box-shadow:var(--shadow);width:34px;height:34px;
+  border-radius:12px;font-size:16px;color:var(--text);font-family:inherit;
+}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-w{text-align:center;font-size:11px;color:var(--muted);padding:6px 0;}
+.cal-d{
+  aspect-ratio:1/1;border-radius:12px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;font-size:14px;position:relative;
+  border:none;background:transparent;font-family:inherit;color:var(--text);
+}
+.cal-d.other{color:#D8CFC9;}
+.cal-d.today{font-weight:700;color:var(--pink);}
+.cal-d.sel{background:var(--pink);color:#fff;font-weight:700;}
+.cal-d.sel .dots i{background:#fff !important;}
+.dots{display:flex;gap:2px;height:5px;margin-top:2px;}
+.dots i{width:5px;height:5px;border-radius:50%;display:block;}
+
+/* ---------- 记录条目 ---------- */
+.rec{
+  display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);
+}
+.rec:last-child{border-bottom:none;}
+.rec-ic{
+  width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:19px;flex-shrink:0;
+}
+.rec-main{flex:1;min-width:0;}
+.rec-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.rec-name{font-size:15px;font-weight:600;}
+.rec-time{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.rec-dur{font-size:13px;font-weight:600;color:var(--pink);}
+.rec-meta{font-size:12px;color:var(--muted);margin-top:3px;}
+.rec-del{
+  border:none;background:transparent;color:#D5CCC6;font-size:18px;padding:2px 4px;
+  font-family:inherit;flex-shrink:0;
+}
+.empty{text-align:center;color:var(--muted);font-size:13px;padding:26px 0;}
+
+/* ---------- 底部 tab ---------- */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);
+  backdrop-filter:blur(10px);border-top:1px solid var(--line);
+  display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:50;
+}
+.tab{
+  flex:1;border:none;background:none;padding:9px 0 7px;font-family:inherit;
+  display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:11px;
+}
+.tab.on{color:var(--pink);font-weight:600;}
+.tab .ti{font-size:21px;line-height:1;}
+
+/* ---------- 弹层 ---------- */
+.mask{
+  position:fixed;inset:0;background:rgba(40,30,25,.42);z-index:100;
+  display:none;align-items:flex-end;justify-content:center;
+}
+.mask.show{display:flex;}
+.sheet{
+  background:#fff;width:100%;max-width:520px;border-radius:24px 24px 0 0;
+  padding:18px 18px calc(18px + env(safe-area-inset-bottom));
+  animation:up .22s ease;
+}
+@keyframes up{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.sheet h3{margin:0 0 4px;font-size:17px;}
+.sheet .sub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+/* ---------- 侧别大按钮 ---------- */
+.side-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.side-btn{
+  height:132px;border-radius:22px;border:2px solid var(--line);background:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  font-family:inherit;color:var(--text);transition:transform .12s,border-color .12s;
+}
+.side-btn:active{transform:scale(.96);border-color:var(--pink);}
+.side-btn .sb-arrow{font-size:26px;color:var(--pink);line-height:1;}
+.side-btn .sb-name{font-size:22px;font-weight:700;letter-spacing:1px;}
+.side-btn .sb-sub{font-size:12px;color:var(--muted);font-weight:400;}
+.side-btn.both{
+  grid-column:span 2;height:86px;flex-direction:row;gap:10px;
+  background:var(--purple-bg);border-color:#DCCDFB;color:var(--purple);
+}
+.side-btn.both .sb-name{font-size:18px;color:var(--purple);}
+.side-btn.both .sb-sub{color:#8E77C9;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{
+  border:1.5px solid var(--line);background:#fff;border-radius:14px;padding:10px 14px;
+  font-size:14px;font-family:inherit;color:var(--text);display:flex;align-items:center;gap:6px;
+}
+.chip.on{border-color:var(--pink);background:var(--pink-bg);color:var(--pink);font-weight:600;}
+.chip .dot{width:12px;height:12px;border-radius:50%;display:block;}
+.field{margin-top:14px;}
+.field label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px;}
+.field input,.field select{
+  width:100%;border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;
+  font-size:16px;font-family:inherit;background:#fff;color:var(--text);
+}
+.quick{display:flex;gap:8px;margin-top:8px;}
+.quick button{
+  flex:1;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:9px 0;
+  font-size:14px;font-family:inherit;color:var(--text);
+}
+.sheet-btns{display:flex;gap:10px;margin-top:18px;}
+.btn{
+  flex:1;border:none;border-radius:16px;padding:14px 0;font-size:16px;font-weight:600;
+  font-family:inherit;background:var(--gray-bg);color:var(--text);
+}
+.btn.primary{background:var(--pink);color:#fff;}
+.btn.primary:disabled{opacity:.45;}
+.sheet-scroll{max-height:70vh;overflow-y:auto;}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:100px;
+  background:rgba(46,42,40,.92);color:#fff;padding:11px 18px;border-radius:14px;
+  font-size:13px;z-index:200;opacity:0;transition:opacity .22s;pointer-events:none;text-align:center;
+}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="h-title">喂奶记录</div>
+    <div class="h-sub" id="hDate"></div>
+  </div>
+  <div class="h-stat" id="hStat"></div>
+</header>
+
+<!-- ============ 记录页 ============ -->
+<div class="page active" id="page-record">
+  <div class="overview">
+    <div class="ov-item"><div class="ov-num pink" id="ovBreast">0</div><div class="ov-label">亲喂次数</div></div>
+    <div class="ov-item"><div class="ov-num purple" id="ovPump">0</div><div class="ov-label">吸奶次数</div></div>
+    <div class="ov-item"><div class="ov-num blue" id="ovBottle">0</div><div class="ov-label">瓶喂 ml</div></div>
+    <div class="ov-item"><div class="ov-num brown" id="ovPoop">0</div><div class="ov-label">大便次数</div></div>
+  </div>
+
+  <div class="big-grid">
+    <button class="big-btn" id="btnBreast" onclick="onBreast()">
+      <span class="tag-side" id="tagBreast" style="display:none"></span>
+      <span class="icon">🤱</span>
+      <span class="name" id="nameBreast">亲喂</span>
+      <span class="timer" id="timerBreast" style="display:none"></span>
+      <span class="hint" id="hintBreast">点击开始</span>
+    </button>
+    <button class="big-btn" id="btnPump" onclick="onPump()">
+      <span class="tag-side pump" id="tagPump" style="display:none"></span>
+      <span class="icon">🍼</span>
+      <span class="name" id="namePump">吸奶</span>
+      <span class="timer" id="timerPump" style="display:none"></span>
+      <span class="hint" id="hintPump">点击开始</span>
+    </button>
+  </div>
+
+  <div class="small-grid">
+    <button class="small-btn" id="btnBottle" onclick="onBottle()">
+      <span class="icon">🥛</span>
+      <span class="name" id="nameBottle">瓶喂</span>
+      <span class="timer" id="timerBottle" style="display:none"></span>
+    </button>
+    <button class="small-btn" id="btnPoop" onclick="onPoop()">
+      <span class="icon">💩</span>
+      <span class="name">大便</span>
+    </button>
+    <button class="small-btn" id="btnManual" onclick="onManual()">
+      <span class="icon">✏️</span>
+      <span class="name">补录</span>
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span>最近记录</span><span class="more" onclick="go('cal')">全部 ›</span></div>
+    <div id="recentList"></div>
+  </div>
+</div>
+
+<!-- ============ 日历页 ============ -->
+<div class="page" id="page-cal">
+  <div class="card">
+    <div class="cal-head">
+      <div class="cal-month" id="calMonth"></div>
+      <div class="cal-nav">
+        <button onclick="shiftMonth(-1)">‹</button>
+        <button onclick="shiftMonth(1)">›</button>
+      </div>
+    </div>
+    <div class="cal-grid" id="calWeek"></div>
+    <div class="cal-grid" id="calDays"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span id="dayTitle">今日记录</span>
+      <span class="more" id="dayCount"></span>
+    </div>
+    <div id="dayList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span>导出</span></div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 12px;">
+      把所有记录导出为 CSV 表格，可用 Excel / WPS /  Numbers 打开，也可直接分享到微信。
+    </div>
+    <div class="sheet-btns" style="margin-top:0">
+      <button class="btn primary" onclick="exportCSV()">导出 CSV</button>
+      <button class="btn" onclick="shareCSV()">分享到微信</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 底部导航 ============ -->
+<div class="tabbar">
+  <button class="tab on" id="tabRecord" onclick="go('record')"><span class="ti">🍼</span>记录</button>
+  <button class="tab" id="tabCal" onclick="go('cal')"><span class="ti">📅</span>日历</button>
+</div>
+
+<!-- ============ 弹层：侧别 ============ -->
+<div class="mask" id="maskSide" onclick="if(event.target===this)closeAll()">
+  <div class="sheet">
+    <h3 id="sideTitle">选择一侧</h3>
+    <div class="sub" id="sideSub">选好后立即开始计时</div>
+    <div class="side-grid">
+      <button class="side-btn" onclick="pickSide('left')">
+        <span class="sb-arrow">◀</span>
+        <span class="sb-name">左侧</span>
+        <span class="sb-sub">左乳</span>
+      </button>
+      <button class="side-btn" onclick="pickSide('right')">
+        <span class="sb-arrow">▶</span>
+        <span class="sb-name">右侧</span>
+        <span class="sb-sub">右乳</span>
+      </button>
+      <button class="side-btn both" id="btnBoth" onclick="pickSide('both')" style="display:none">
+        <span class="sb-name">双侧同时</span>
+        <span class="sb-sub">双泵吸奶</span>
+      </button>
+    </div>
+    <div class="sheet-btns"><button class="btn" onclick="closeAll()">取消</button></div>
+  </div>
+</div>
+
+<!-- ============ 弹层：瓶喂奶量 ============ -->
+<div class="mask" id="maskBottle" onclick="if(event.target===this)closeAll()">
+  <div class="sheet">
+    <h3>瓶喂奶量</h3>
+    <div class="sub">确认后开始计时，再次点击按钮结束</div>
+    <div class="field">
+      <label>奶量（ml）</label>
+      <input type="number" id="bottleAmount" inputmode="numeric" placeholder="例如 120">
+    </div>
+    <div class="quick">
+      <button onclick="setAmount(60)">60</button>
+      <button onclick="setAmount(90)">90</button>
+      <button onclick="setAmount(120)">120</button>
+      <button onclick="setAmount(150)">150</button>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn" onclick="closeAll()">取消</button>
+      <button class="btn primary" onclick="startBottle()">开始瓶喂</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 弹层：大便 ============ -->
+<div class="mask" id="maskPoop" onclick="if(event.target===this)closeAll()">
+  <div class="sheet">
+    <h3>大便记录</h3>
+    <div class="sub" id="poopTime"></div>
+    <div class="field">
+      <label>性状</label>
+      <div class="chips" id="poopState"></div>
+    </div>
+    <div class="field">
+      <label>颜色</label>
+      <div class="chips" id="poopColor"></div>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn" onclick="closeAll()">取消</button>
+      <button class="btn primary" onclick="savePoop()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 弹层：补录 ============ -->
+<div class="mask" id="maskManual" onclick="if(event.target===this)closeAll()">
+  <div class="sheet">
+    <div class="sheet-scroll">
+      <h3>手动补录</h3>
+      <div class="sub">忘了按时记？在这里补上</div>
+      <div class="field">
+        <label>类型</label>
+        <div class="chips" id="mType"></div>
+      </div>
+      <div class="field" id="mSideField">
+        <label>侧别</label>
+        <div class="chips" id="mSide"></div>
+      </div>
+      <div class="field" id="mAmountField" style="display:none">
+        <label>奶量（ml）</label>
+        <input type="number" id="mAmount" inputmode="numeric" placeholder="例如 120">
+      </div>
+      <div class="field" id="mDurField">
+        <label>时长（分钟，留空按结束时间自动算）</label>
+        <input type="number" id="mDur" inputmode="numeric" placeholder="例如 20">
+      </div>
+      <div class="field" id="mPoopField" style="display:none">
+        <label>性状</label>
+        <div class="chips" id="mPoopState"></div>
+        <label style="margin-top:10px">颜色</label>
+        <div class="chips" id="mPoopColor"></div>
+      </div>
+      <div class="field">
+        <label>开始时间</label>
+        <input type="datetime-local" id="mStart">
+      </div>
+      <div class="field" id="mEndField">
+        <label>结束时间（可留空）</label>
+        <input type="datetime-local" id="mEnd">
+      </div>
+      <div class="field">
+        <label>备注（可选）</label>
+        <input type="text" id="mNote" placeholder="例如 换边一次">
+      </div>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn" onclick="closeAll()">取消</button>
+      <button class="btn primary" onclick="saveManual()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 数据 ================= */
+var K_REC='bf_records_v1', K_ACT='bf_active_v1', K_LAST='bf_lastside_v1';
+var records=[], active=null, lastSide=null;
+var POOP_STATE=['水样','稀糊','软糊','成形','干硬','有奶瓣'];
+var POOP_COLOR=[
+  {n:'金黄',c:'#E8B53A'},{n:'黄色',c:'#F0D264'},{n:'黄绿',c:'#BFC94A'},
+  {n:'绿色',c:'#6FAE5B'},{n:'深绿',c:'#3F7A46'},{n:'棕色',c:'#A5713F'},
+  {n:'黑色',c:'#3A3330'},{n:'灰白',c:'#D8D2CB'},{n:'带血丝',c:'#D0554E'}
+];
+var TYPE={breast:{n:'亲喂',i:'🤱',c:'pink',bg:'#FFEDF3'},
+          pump:{n:'吸奶',i:'🍼',c:'purple',bg:'#F2EDFF'},
+          bottle:{n:'瓶喂',i:'🥛',c:'blue',bg:'#E9F3FC'},
+          poop:{n:'大便',i:'💩',c:'brown',bg:'#F8F0E8'}};
+
+/* 本地存储容错：某些环境（无痕模式 / 第三方 iframe / 部分内置浏览器）
+   写入 localStorage 会直接抛异常，必须包起来，否则会中断后续 UI 逻辑 */
+var LS_OK=true;
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){LS_OK=false;return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){if(LS_OK){LS_OK=false;toast('浏览器禁止保存数据，请换系统浏览器打开');}}}
+function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+function load(){
+  try{records=JSON.parse(lsGet(K_REC)||'[]');}catch(e){records=[];}
+  if(!Array.isArray(records))records=[];
+  try{active=JSON.parse(lsGet(K_ACT)||'null');}catch(e){active=null;}
+  if(active&&!active.start)active=null;
+  lastSide=lsGet(K_LAST)||null;
+}
+function save(){lsSet(K_REC,JSON.stringify(records));}
+function saveActive(){if(active)lsSet(K_ACT,JSON.stringify(active));else lsDel(K_ACT);}
+function pad(n){return n<10?'0'+n:''+n;}
+function dstr(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function tstr(d){return pad(d.getHours())+':'+pad(d.getMinutes());}
+function dtstr(d){return dstr(d)+' '+tstr(d);}
+function localInput(d){return dstr(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes());}
+function fmtDur(s){
+  if(s<0)s=0;
+  var h=Math.floor(s/3600),m=Math.floor(s%3600/60),sec=s%60;
+  if(h>0)return h+':'+pad(m)+':'+pad(sec);
+  return pad(m)+':'+pad(sec);
+}
+function fmtDurText(s){
+  if(s==null)return '';
+  var m=Math.round(s/60);
+  if(m<60)return m+' 分钟';
+  return Math.floor(m/60)+' 小时 '+pad(m%60)+' 分';
+}
+/* 原生桥：装进 APK 后，把"正在计时"的状态同步给桌面小组件；网页版里 window.Android 不存在，直接跳过 */
+function syncNative(){
+  try{
+    if(window.Android&&window.Android.onSessionChanged){
+      window.Android.onSessionChanged(active?JSON.stringify({type:active.type,side:active.side,start:active.start}):'');
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+function nativeExport(csv,filename,wantShare){
+  try{
+    if(window.Android&&window.Android.exportCsv){
+      window.Android.exportCsv(csv,filename,wantShare?1:0);
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show');},2200);
+}
+function uid(){return Date.now()+'_'+Math.random().toString(36).slice(2,7);}
+
+/* ================= 流程：开始 / 结束 ================= */
+function onBreast(){
+  if(lpFired){lpFired=false;return;}
+  if(active&&active.type!=='breast'){toast('请先结束当前「'+TYPE[active.type].n+'」');return;}
+  if(active){endActive();return;}
+  openSide('breast');
+}
+function onPump(){
+  if(lpFired){lpFired=false;return;}
+  if(active&&active.type!=='pump'){toast('请先结束当前「'+TYPE[active.type].n+'」');return;}
+  if(active){endActive();return;}
+  openSide('pump');
+}
+function onBottle(){
+  if(lpFired){lpFired=false;return;}
+  if(active&&active.type!=='bottle'){toast('请先结束当前「'+TYPE[active.type].n+'」');return;}
+  if(active){endActive();return;}
+  document.getElementById('bottleAmount').value='';
+  show('maskBottle');
+}
+/* 长按进行中的按钮 = 丢弃，作为误点开始后的自救入口 */
+var lpFired=false;
+function bindLongPress(el,fn){
+  var timer=null;
+  function start(){timer=setTimeout(function(){lpFired=true;fn();},700);}
+  function cancel(){if(timer){clearTimeout(timer);timer=null;}}
+  el.addEventListener('touchstart',start,{passive:true});
+  el.addEventListener('touchend',cancel);
+  el.addEventListener('touchmove',cancel);
+  el.addEventListener('mousedown',start);
+  el.addEventListener('mouseup',cancel);
+  el.addEventListener('mouseleave',cancel);
+}
+function startBottle(){
+  var v=parseInt(document.getElementById('bottleAmount').value,10);
+  if(!v||v<=0){toast('请先填写奶量');return;}
+  closeAll();
+  startActive('bottle',null,v);
+}
+function openSide(type){
+  pendingType=type;
+  var isP=(type==='pump');
+  document.getElementById('sideTitle').textContent=isP?'吸奶哪一侧？':'亲喂哪一侧？';
+  document.getElementById('sideSub').textContent=isP?'双侧（双泵）或单侧，选好立即开始计时':'选好后立即开始计时';
+  document.getElementById('btnBoth').style.display=isP?'':'none';
+  show('maskSide');
+}
+function pickSide(side){
+  var type=pendingType||'breast';
+  closeAll();                       // 先关弹层，之后即使出错也不会卡住界面
+  startActive(type,side,null);
+}
+function startActive(type,side,amount){
+  active={id:uid(),type:type,side:side||null,amount:amount||null,start:Date.now()};
+  saveActive();
+  if(type!=='bottle'&&side){lsSet(K_LAST,side);lastSide=side;}
+  renderAll();syncNative();
+  toast('已开始'+TYPE[type].n+(side?('·'+(side==='both'?'双侧':side==='left'?'左侧':'右侧')):''));
+}
+function endActive(){
+  if(!active)return;
+  var dur=Math.round((Date.now()-active.start)/1000);
+  if(dur<0)dur=0;
+  records.push({id:active.id,type:active.type,side:active.side,amount:active.amount,
+    start:active.start,end:Date.now(),dur:dur,note:''});
+  var t=active.type,side=active.side;
+  active=null;saveActive();save();renderAll();syncNative();
+  var msg=TYPE[t].n+'结束 · 时长 '+fmtDurText(dur);
+  if(t==='breast'){
+    var next=side==='left'?'右侧':'左侧';
+    msg+='\n下次建议从'+next+'开始';
+  }
+  toast(msg);
+}
+function discardActive(){
+  if(!active){toast('当前没有进行中的记录');return;}
+  if(!confirm('丢弃当前正在进行的「'+TYPE[active.type].n+'」？时长不会保存'))return;
+  active=null;saveActive();renderAll();syncNative();toast('已丢弃');
+}
+
+/* ================= 大便 ================= */
+var poopDraft=null;
+function onPoop(){
+  if(active){toast('请先结束当前「'+TYPE[active.type].n+'」');return;}
+  poopDraft={start:Date.now(),state:'',color:''};
+  document.getElementById('poopTime').textContent='记录时间 '+dtstr(new Date());
+  buildChips('poopState',POOP_STATE.map(function(s){return{n:s,c:null};}),function(v){poopDraft.state=v;},function(){return poopDraft.state;});
+  buildChips('poopColor',POOP_COLOR,function(v){poopDraft.color=v;},function(){return poopDraft.color;});
+  show('maskPoop');
+}
+function savePoop(){
+  closeAll();
+  records.push({id:uid(),type:'poop',side:null,amount:null,start:poopDraft.start,end:null,dur:0,
+    poopState:poopDraft.state,poopColor:poopDraft.color,note:''});
+  save();renderAll();toast('大便已记录');
+}
+
+/* ================= 补录 ================= */
+var mDraft={type:'breast',side:'left',state:'',color:''};
+function onManual(){
+  mDraft={type:'breast',side:'left',state:'',color:''};
+  document.getElementById('mStart').value=localInput(new Date());
+  document.getElementById('mEnd').value='';
+  document.getElementById('mAmount').value='';
+  document.getElementById('mDur').value='';
+  document.getElementById('mNote').value='';
+  buildChips('mType',[{n:'亲喂',c:null,k:'breast'},{n:'吸奶',c:null,k:'pump'},
+    {n:'瓶喂',c:null,k:'bottle'},{n:'大便',c:null,k:'poop'}],
+    function(v){mDraft.type=v;refreshManual();},function(){return mDraft.type;},'k');
+  buildChips('mSide',[{n:'左侧',c:null,k:'left'},{n:'右侧',c:null,k:'right'},{n:'双侧',c:null,k:'both'}],
+    function(v){mDraft.side=v;refreshManual();},function(){return mDraft.side;},'k');
+  buildChips('mPoopState',POOP_STATE.map(function(s){return{n:s,c:null};}),function(v){mDraft.state=v;},function(){return mDraft.state;});
+  buildChips('mPoopColor',POOP_COLOR,function(v){mDraft.color=v;},function(){return mDraft.color;});
+  refreshManual();
+  show('maskManual');
+}
+function refreshManual(){
+  var t=mDraft.type;
+  document.getElementById('mSideField').style.display=(t==='breast'||t==='pump')?'':'none';
+  document.getElementById('mAmountField').style.display=(t==='bottle')?'':'none';
+  document.getElementById('mDurField').style.display=(t==='poop')?'none':'';
+  document.getElementById('mEndField').style.display=(t==='poop')?'none':'';
+  document.getElementById('mPoopField').style.display=(t==='poop')?'':'none';
+  var chips=document.getElementById('mType').children;
+  for(var i=0;i<chips.length;i++){
+    chips[i].classList.toggle('on',chips[i].dataset.k===t);
+  }
+  var sc=document.getElementById('mSide').children;
+  for(var j=0;j<sc.length;j++){sc[j].classList.toggle('on',sc[j].dataset.k===mDraft.side);}
+}
+function saveManual(){
+  var s=document.getElementById('mStart').value;
+  if(!s){toast('请填写开始时间');return;}
+  var st=new Date(s).getTime();
+  var et=document.getElementById('mEnd').value?new Date(document.getElementById('mEnd').value).getTime():null;
+  var dur=parseInt(document.getElementById('mDur').value,10);
+  if(!dur&&et)dur=Math.round((et-st)/1000);
+  if(!dur)dur=0;
+  if(et&&et<st){toast('结束时间早于开始时间');return;}
+  var rec={id:uid(),type:mDraft.type,side:(mDraft.type==='breast'||mDraft.type==='pump')?mDraft.side:null,
+    amount:mDraft.type==='bottle'?parseInt(document.getElementById('mAmount').value,10)||null:null,
+    start:st,end:et,dur:dur,poopState:mDraft.type==='poop'?mDraft.state:null,
+    poopColor:mDraft.type==='poop'?mDraft.color:null,note:document.getElementById('mNote').value};
+  closeAll();
+  records.push(rec);save();renderAll();toast('已补录');
+}
+
+/* ================= chips 组件 ================= */
+function buildChips(id,list,onPick,getVal,keyField){
+  var box=document.getElementById(id);box.innerHTML='';
+  list.forEach(function(it){
+    var k=keyField?it[keyField]:it.n;
+    var v=it.n;
+    var b=document.createElement('button');
+    b.className='chip';b.dataset.k=k;
+    b.innerHTML=(it.c?'<span class="dot" style="background:'+it.c+'"></span>':'')+v;
+    b.onclick=function(){
+      onPick(k);
+      var cs=box.children;
+      for(var i=0;i<cs.length;i++){cs[i].classList.toggle('on',cs[i].dataset.k===k);}
+    };
+    box.appendChild(b);
+  });
+}
+
+/* ================= 渲染 ================= */
+function renderAll(){renderHeader();renderButtons();renderRecent();renderCal();}
+function renderHeader(){
+  var now=new Date();
+  document.getElementById('hDate').textContent=
+    (now.getMonth()+1)+'月'+now.getDate()+'日 '+'周'+'日一二三四五六'[now.getDay()];
+  var last=null;
+  for(var i=records.length-1;i>=0;i--){
+    if(records[i].type==='breast'||records[i].type==='bottle'){last=records[i];break;}
+  }
+  var el=document.getElementById('hStat');
+  if(!last){el.innerHTML='暂无喂养记录';return;}
+  var gap=Math.floor((Date.now()-last.start)/60000);
+  var txt=gap<60?gap+' 分钟前':Math.floor(gap/60)+' 小时'+pad(gap%60)+'分前';
+  el.innerHTML='上次喂养<br><b>'+txt+'</b>';
+}
+function renderButtons(){
+  var a=active;
+  var ids=['Breast','Pump','Bottle'];
+  ['breast','pump','bottle'].forEach(function(t,i){
+    var p=ids[i];
+    var btn=document.getElementById('btn'+p);
+    var name=document.getElementById('name'+p);
+    var timer=document.getElementById('timer'+p);
+    var hint=document.getElementById('hint'+p);
+    var tag=document.getElementById('tag'+p);
+    var running=a&&a.type===t;
+    btn.classList.toggle('running',!!running);
+    btn.classList.toggle('disabled',!!(a&&!running));
+    if(running){
+      name.textContent=TYPE[t].n+'结束';
+      timer.style.display='';timer.textContent=fmtDur(Math.round((Date.now()-a.start)/1000));
+      if(hint)hint.textContent='点击结束 · 长按丢弃';
+      if(tag){tag.style.display='';tag.textContent=a.side==='both'?'双侧':a.side==='left'?'左侧':'右侧';}
+    }else{
+      name.textContent=TYPE[t].n;
+      if(timer)timer.style.display='none';
+      if(hint){
+        hint.textContent=(t==='breast'&&lastSide)?('上次：'+(lastSide==='left'?'左侧':'右侧')+' · 建议换边'):'点击开始';
+      }
+      if(tag)tag.style.display='none';
+    }
+  });
+  var bb=document.getElementById('btnBottle');
+  bb.classList.toggle('disabled',!!(a&&a.type!=='bottle'));
+}
+function renderRecent(){
+  var box=document.getElementById('recentList');
+  var list=records.slice().sort(function(a,b){return b.start-a.start;}).slice(0,5);
+  if(!list.length){box.innerHTML='<div class="empty">还没有记录，点上面的按钮开始吧</div>';return;}
+  box.innerHTML=list.map(recRow).join('');
+  var ov=countDay(dstr(new Date()));
+  document.getElementById('ovBreast').textContent=ov.breast;
+  document.getElementById('ovPump').textContent=ov.pump;
+  document.getElementById('ovBottle').textContent=ov.bottleMl;
+  document.getElementById('ovPoop').textContent=ov.poop;
+}
+function recRow(r){
+  var t=TYPE[r.type];
+  var meta=[];
+  if(r.side)meta.push(r.side==='both'?'双侧':r.side==='left'?'左侧':'右侧');
+  if(r.amount)meta.push(r.amount+' ml');
+  if(r.type==='poop'){
+    if(r.poopState)meta.push(r.poopState);
+    if(r.poopColor)meta.push(r.poopColor);
+  }
+  if(r.note)meta.push(r.note);
+  var time=tstr(new Date(r.start))+(r.end?' → '+tstr(new Date(r.end)):'');
+  var durHtml=(r.dur>0&&r.type!=='poop')?'<span class="rec-dur">'+fmtDurText(r.dur)+'</span>':'';
+  return '<div class="rec">'+
+    '<div class="rec-ic" style="background:'+t.bg+'">'+t.i+'</div>'+
+    '<div class="rec-main"><div class="rec-top"><span class="rec-name">'+t.n+'</span>'+
+    '<span class="rec-time">'+time+'</span>'+durHtml+'</div>'+
+    (meta.length?'<div class="rec-meta">'+meta.join(' · ')+'</div>':'')+
+    '</div>'+
+    '<button class="rec-del" onclick="delRec(\''+r.id+'\')">×</button></div>';
+}
+function delRec(id){
+  if(!confirm('删除这条记录？'))return;
+  records=records.filter(function(r){return r.id!==id;});
+  save();renderAll();toast('已删除');
+}
+function countDay(ds){
+  var o={breast:0,pump:0,bottleMl:0,poop:0,total:0};
+  records.forEach(function(r){
+    if(dstr(new Date(r.start))!==ds)return;
+    o.total++;
+    if(r.type==='breast')o.breast++;
+    else if(r.type==='pump')o.pump++;
+    else if(r.type==='bottle')o.bottleMl+=(r.amount||0);
+    else if(r.type==='poop')o.poop++;
+  });
+  return o;
+}
+
+/* ================= 日历 ================= */
+var viewY,viewM,selDate;
+function initCal(){
+  var n=new Date();
+  viewY=n.getFullYear();viewM=n.getMonth();
+  selDate=dstr(n);
+}
+function shiftMonth(d){
+  viewM+=d;
+  if(viewM<0){viewM=11;viewY--;}
+  if(viewM>11){viewM=0;viewY++;}
+  renderCal();
+}
+function renderCal(){
+  var W=['一','二','三','四','五','六','日'];
+  document.getElementById('calWeek').innerHTML=W.map(function(w){
+    return '<div class="cal-w">'+w+'</div>';}).join('');
+  var first=new Date(viewY,viewM,1);
+  var offset=(first.getDay()+6)%7;      // 周一开头
+  var days=new Date(viewY,viewM+1,0).getDate();
+  var prevDays=new Date(viewY,viewM,0).getDate();
+  var html='';
+  for(var i=0;i<offset;i++){
+    html+='<div class="cal-d other">'+(prevDays-offset+i+1)+'</div>';
+  }
+  var todayStr=dstr(new Date());
+  for(var d=1;d<=days;d++){
+    var ds=viewY+'-'+pad(viewM+1)+'-'+pad(d);
+    var c=countDay(ds);
+    var dots='';
+    if(c.breast)dots+='<i style="background:#F2729B"></i>';
+    if(c.pump)dots+='<i style="background:#9B7BE8"></i>';
+    if(c.bottleMl)dots+='<i style="background:#4E9BE0"></i>';
+    if(c.poop)dots+='<i style="background:#C0895C"></i>';
+    var cls='cal-d'+(ds===todayStr?' today':'')+(ds===selDate?' sel':'');
+    html+='<button class="'+cls+'" onclick="pickDate(\''+ds+'\')">'+d+
+      '<span class="dots">'+dots.slice(0,4)+'</span></button>';
+  }
+  document.getElementById('calDays').innerHTML=html;
+  document.getElementById('calMonth').textContent=viewY+'年'+(viewM+1)+'月';
+  renderDay();
+}
+function pickDate(ds){
+  selDate=ds;
+  if(ds.slice(0,7)!==viewY+'-'+pad(viewM+1)){
+    var p=ds.split('-');viewY=+p[0];viewM=+p[1]-1;
+  }
+  renderCal();
+}
+function renderDay(){
+  var list=records.filter(function(r){return dstr(new Date(r.start))===selDate;})
+    .sort(function(a,b){return b.start-a.start;});
+  var todayStr=dstr(new Date());
+  var title=selDate===todayStr?'今日记录':(selDate.slice(5).replace('-','月')+'日记录');
+  document.getElementById('dayTitle').textContent=title;
+  document.getElementById('dayCount').textContent=list.length?('共 '+list.length+' 条'):'';
+  var box=document.getElementById('dayList');
+  box.innerHTML=list.length?list.map(recRow).join(''):'<div class="empty">这天没有记录</div>';
+}
+
+/* ================= 导出 ================= */
+function buildCSV(){
+  var head=['类型','开始时间','结束时间','时长(分钟)','侧别','奶量(ml)','大便性状','大便颜色','备注'];
+  var rows=[head];
+  records.slice().sort(function(a,b){return a.start-b.start;}).forEach(function(r){
+    rows.push([
+      TYPE[r.type].n,
+      dtstr(new Date(r.start)),
+      r.end?dtstr(new Date(r.end)):'',
+      (r.end!=null&&r.dur!=null)?Math.round(r.dur/60):'',
+      r.side?(r.side==='both'?'双侧':r.side==='left'?'左侧':'右侧'):'',
+      r.amount||'',
+      r.poopState||'',
+      r.poopColor||'',
+      r.note||''
+    ]);
+  });
+  var csv=rows.map(function(row){
+    return row.map(function(v){
+      v=(''+v);
+      return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
+    }).join(',');
+  }).join('\r\n');
+  return '\ufeff'+csv;
+}
+function exportCSV(){
+  if(!records.length){toast('还没有记录可导出');return;}
+  var fn='喂奶记录_'+dstr(new Date())+'.csv';
+  if(nativeExport(buildCSV(),fn,false)){toast('已保存 '+records.length+' 条到「下载」目录');return;}
+  var blob=new Blob([buildCSV()],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download=fn;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  toast('已导出 '+records.length+' 条，保存到「下载」目录');
+}
+function shareCSV(){
+  if(!records.length){toast('还没有记录可导出');return;}
+  var fn='喂奶记录_'+dstr(new Date())+'.csv';
+  if(nativeExport(buildCSV(),fn,true))return;
+  var blob=new Blob([buildCSV()],{type:'text/csv;charset=utf-8'});
+  var file=new File([blob],fn,{type:'text/csv'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:'喂奶记录'}).catch(function(){exportCSV();});
+  }else{
+    toast('当前浏览器不支持直接分享，已改为下载');
+    exportCSV();
+  }
+}
+
+/* ================= 弹层 / 导航 ================= */
+var pendingType=null;
+function show(id){closeAll();document.getElementById(id).classList.add('show');}
+function closeAll(){
+  var ms=document.querySelectorAll('.mask');
+  for(var i=0;i<ms.length;i++){ms[i].classList.remove('show');}
+}
+function go(p){
+  document.getElementById('page-record').classList.toggle('active',p==='record');
+  document.getElementById('page-cal').classList.toggle('active',p==='cal');
+  document.getElementById('tabRecord').classList.toggle('on',p==='record');
+  document.getElementById('tabCal').classList.toggle('on',p==='cal');
+  if(p==='cal')renderCal();
+  window.scrollTo(0,0);
+}
+function setAmount(v){document.getElementById('bottleAmount').value=v;}
+
+/* ================= 启动 ================= */
+load();initCal();renderAll();syncNative();
+['btnBreast','btnPump','btnBottle'].forEach(function(id){
+  bindLongPress(document.getElementById(id),discardActive);
+});
+/* 忘了结束的计时：超过 6 小时自动询问，避免一直挂着 */
+if(active&&Date.now()-active.start>6*3600*1000){
+  setTimeout(function(){
+    if(!active)return;
+    if(confirm('有一个「'+TYPE[active.type].n+'」计时已超过 6 小时，应该是忘了结束。\n确定 = 现在结束并保存，取消 = 丢弃不保存')){
+      endActive();
+    }else{
+      active=null;saveActive();renderAll();toast('已丢弃超时记录');
+    }
+  },600);
+}
+setInterval(function(){
+  if(active){renderButtons();renderHeader();}
+},1000);
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&active){renderButtons();}
+});
+</script>
+</body>
+</html>
