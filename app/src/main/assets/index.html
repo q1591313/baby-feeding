@@ -228,6 +228,30 @@ header{
 .btn.primary:disabled{opacity:.45;}
 .sheet-scroll{max-height:70vh;overflow-y:auto;}
 
+/* ---------- 生长页 ---------- */
+.grow-stat{display:flex;text-align:center;}
+.grow-stat .ov-item{flex:1;}
+.gstat-edit{font-size:12px;color:var(--muted);text-decoration:underline dotted;}
+.chips-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.chips-row .lb{font-size:12px;color:var(--muted);}
+.chart-box{position:relative;width:100%;height:250px;}
+.chart-box canvas{width:100%;height:100%;display:block;}
+.chart-note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6;}
+.chart-note b{color:var(--pink);}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:6px;}
+.legend i{width:14px;height:3px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;}
+.grow-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);}
+.grow-row:last-child{border-bottom:none;}
+.gr-date{font-size:13px;font-weight:600;min-width:86px;}
+.gr-age{font-size:11px;color:var(--muted);}
+.gr-val{flex:1;font-size:14px;color:var(--text);}
+.gr-val b{color:var(--pink);}
+.gr-val .h{color:var(--purple);b:auto;}
+.btn-line{border:none;background:var(--card);box-shadow:var(--shadow);border-radius:16px;
+  padding:14px 0;font-size:16px;font-weight:600;font-family:inherit;color:var(--pink);
+  width:100%;margin-top:14px;}
+.std-note{font-size:11px;color:var(--muted);margin-top:8px;}
+
 /* ---------- toast ---------- */
 .toast{
   position:fixed;left:50%;transform:translateX(-50%);bottom:100px;
@@ -329,10 +353,64 @@ header{
   </div>
 </div>
 
+<!-- ============ 生长页 ============ -->
+<div class="page" id="page-grow">
+  <div class="card" id="birthCard" onclick="editBirth()">
+    <div class="card-title">
+      <span id="birthTitle">出生信息（点我填写）</span>
+      <span class="more">编辑 ›</span>
+    </div>
+    <div id="birthBody" class="rec-meta"></div>
+  </div>
+
+  <div class="card" style="padding:10px 0;">
+    <div class="grow-stat">
+      <div class="ov-item"><div class="ov-num pink" id="gsW">--</div><div class="ov-label">当前体重 kg</div></div>
+      <div class="ov-item"><div class="ov-num purple" id="gsRate">--</div><div class="ov-label">日增重 g/天</div></div>
+      <div class="ov-item"><div class="ov-num blue" id="gsH">--</div><div class="ov-label">当前身长 cm</div></div>
+    </div>
+  </div>
+
+  <button class="btn-line" onclick="openGrow()">＋ 记一笔体重 / 身长</button>
+
+  <div class="card">
+    <div class="chips-row">
+      <span class="lb">标准</span>
+      <button class="chip" id="stdWho" onclick="setStd('who')">WHO 国际</button>
+      <button class="chip" id="stdCn" onclick="setStd('cn')">中国 2022</button>
+    </div>
+    <div class="chips-row" style="margin-top:8px;">
+      <span class="lb">指标</span>
+      <button class="chip" id="idxW" onclick="setIdx('w')">体重</button>
+      <button class="chip" id="idxH" onclick="setIdx('l')">身长</button>
+      <span class="lb" style="margin-left:8px;">范围</span>
+      <button class="chip" id="rng6" onclick="setRng(6)">0-6月</button>
+      <button class="chip" id="rng24" onclick="setRng(24)">0-24月</button>
+    </div>
+    <div class="chart-box"><canvas id="growChart"></canvas></div>
+    <div class="chart-note" id="growNote"></div>
+    <div class="legend">
+      <span><i style="background:#F2729B"></i>宝宝</span>
+      <span><i style="background:#B9AEA8"></i>P50 中位</span>
+      <span><i style="background:#E3D9D3"></i>P3–P97 正常带</span>
+    </div>
+    <div class="std-note" id="stdNote"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span>测量记录</span><span class="more" id="growCount"></span></div>
+    <div id="growList"></div>
+    <div class="sheet-btns" style="margin-top:12px;">
+      <button class="btn primary" onclick="exportGrowthCSV()">导出生长 CSV</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ 底部导航 ============ -->
 <div class="tabbar">
   <button class="tab on" id="tabRecord" onclick="go('record')"><span class="ti">🍼</span>记录</button>
   <button class="tab" id="tabCal" onclick="go('cal')"><span class="ti">📅</span>日历</button>
+  <button class="tab" id="tabGrow" onclick="go('grow')"><span class="ti">📈</span>生长</button>
 </div>
 
 <!-- ============ 弹层：侧别 ============ -->
@@ -450,6 +528,58 @@ header{
   </div>
 </div>
 
+<!-- ============ 弹层：记一笔生长 ============ -->
+<div class="mask" id="maskGrow" onclick="if(event.target===this)closeAll()">
+  <div class="sheet">
+    <h3>记一笔体重 / 身长</h3>
+    <div class="sub">体重必填一项，身长可空着；同一天再记会覆盖当天</div>
+    <div class="field">
+      <label>日期</label>
+      <input type="date" id="gDate">
+    </div>
+    <div class="field">
+      <label>体重（kg，例如 4.85）</label>
+      <input type="number" id="gW" inputmode="decimal" step="0.005" min="1" max="30" placeholder="例如 4.85">
+    </div>
+    <div class="field">
+      <label>身长（cm，可空）</label>
+      <input type="number" id="gH" inputmode="decimal" step="0.1" min="30" max="120" placeholder="例如 56.5">
+    </div>
+    <div class="field">
+      <label>备注（可选）</label>
+      <input type="text" id="gNote" placeholder="例如 儿保称的">
+    </div>
+    <div class="sheet-btns">
+      <button class="btn" onclick="closeAll()">取消</button>
+      <button class="btn primary" onclick="saveGrow()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 弹层：出生信息 ============ -->
+<div class="mask" id="maskBirth" onclick="if(event.target===this)closeAll()">
+  <div class="sheet">
+    <h3>出生信息</h3>
+    <div class="sub">作为生长曲线的起点，也用来算月龄</div>
+    <div class="field">
+      <label>出生日期</label>
+      <input type="date" id="bDate">
+    </div>
+    <div class="field">
+      <label>出生体重（kg，例如 3.30）</label>
+      <input type="number" id="bW" inputmode="decimal" step="0.005" min="1" max="6" placeholder="例如 3.30">
+    </div>
+    <div class="field">
+      <label>出生身长（cm，可空）</label>
+      <input type="number" id="bH" inputmode="decimal" step="0.1" min="40" max="60" placeholder="例如 50.0">
+    </div>
+    <div class="sheet-btns">
+      <button class="btn" onclick="closeAll()">取消</button>
+      <button class="btn primary" onclick="saveBirth()">保存</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -467,6 +597,14 @@ var TYPE={breast:{n:'亲喂',i:'🤱',c:'pink',bg:'#FFEDF3'},
           bottle:{n:'瓶喂',i:'🥛',c:'blue',bg:'#E9F3FC'},
           poop:{n:'大便',i:'💩',c:'brown',bg:'#F8F0E8'}};
 
+/* ================= 生长标准数据（女童）================= */
+/* WHO: 0-24月逐月，P3/P15/P50/P85/P97，来源 who.int 官方表
+   CN:  WS/T 423-2022《7岁以下儿童生长标准》女童表5/表6，P3/P25/P50/P75/P97，
+        月点 0-12 逐月 + 15/18/21/24 */
+var REF={"who":{"w":[{"m":0,"p3":2.4,"p15":2.8,"p50":3.2,"p85":3.7,"p97":4.2},{"m":1,"p3":3.2,"p15":3.6,"p50":4.2,"p85":4.8,"p97":5.4},{"m":2,"p3":4,"p15":4.5,"p50":5.1,"p85":5.9,"p97":6.5},{"m":3,"p3":4.6,"p15":5.1,"p50":5.8,"p85":6.7,"p97":7.4},{"m":4,"p3":5.1,"p15":5.6,"p50":6.4,"p85":7.3,"p97":8.1},{"m":5,"p3":5.5,"p15":6.1,"p50":6.9,"p85":7.8,"p97":8.7},{"m":6,"p3":5.8,"p15":6.4,"p50":7.3,"p85":8.3,"p97":9.2},{"m":7,"p3":6.1,"p15":6.7,"p50":7.6,"p85":8.7,"p97":9.6},{"m":8,"p3":6.3,"p15":7,"p50":7.9,"p85":9,"p97":10},{"m":9,"p3":6.6,"p15":7.3,"p50":8.2,"p85":9.3,"p97":10.4},{"m":10,"p3":6.8,"p15":7.5,"p50":8.5,"p85":9.6,"p97":10.7},{"m":11,"p3":7,"p15":7.7,"p50":8.7,"p85":9.9,"p97":11},{"m":12,"p3":7.1,"p15":7.9,"p50":8.9,"p85":10.2,"p97":11.3},{"m":13,"p3":7.3,"p15":8.1,"p50":9.2,"p85":10.4,"p97":11.6},{"m":14,"p3":7.5,"p15":8.3,"p50":9.4,"p85":10.7,"p97":11.9},{"m":15,"p3":7.7,"p15":8.5,"p50":9.6,"p85":10.9,"p97":12.2},{"m":16,"p3":7.8,"p15":8.7,"p50":9.8,"p85":11.2,"p97":12.5},{"m":17,"p3":8,"p15":8.8,"p50":10,"p85":11.4,"p97":12.7},{"m":18,"p3":8.2,"p15":9,"p50":10.2,"p85":11.6,"p97":13},{"m":19,"p3":8.3,"p15":9.2,"p50":10.4,"p85":11.9,"p97":13.3},{"m":20,"p3":8.5,"p15":9.4,"p50":10.6,"p85":12.1,"p97":13.5},{"m":21,"p3":8.7,"p15":9.6,"p50":10.9,"p85":12.4,"p97":13.8},{"m":22,"p3":8.8,"p15":9.8,"p50":11.1,"p85":12.6,"p97":14.1},{"m":23,"p3":9,"p15":9.9,"p50":11.3,"p85":12.8,"p97":14.3},{"m":24,"p3":9.2,"p15":10.1,"p50":11.5,"p85":13.1,"p97":14.6}],"l":[{"m":0,"p3":45.6,"p15":47.2,"p50":49.1,"p85":51.1,"p97":52.7},{"m":1,"p3":50,"p15":51.7,"p50":53.7,"p85":55.7,"p97":57.4},{"m":2,"p3":53.2,"p15":55,"p50":57.1,"p85":59.2,"p97":60.9},{"m":3,"p3":55.8,"p15":57.6,"p50":59.8,"p85":62,"p97":63.8},{"m":4,"p3":58,"p15":59.8,"p50":62.1,"p85":64.3,"p97":66.2},{"m":5,"p3":59.9,"p15":61.7,"p50":64,"p85":66.3,"p97":68.2},{"m":6,"p3":61.5,"p15":63.4,"p50":65.7,"p85":68.1,"p97":70},{"m":7,"p3":62.9,"p15":64.9,"p50":67.3,"p85":69.7,"p97":71.6},{"m":8,"p3":64.3,"p15":66.3,"p50":68.7,"p85":71.2,"p97":73.2},{"m":9,"p3":65.6,"p15":67.6,"p50":70.1,"p85":72.6,"p97":74.7},{"m":10,"p3":66.8,"p15":68.9,"p50":71.5,"p85":74,"p97":76.1},{"m":11,"p3":68,"p15":70.2,"p50":72.8,"p85":75.4,"p97":77.5},{"m":12,"p3":69.2,"p15":71.3,"p50":74,"p85":76.7,"p97":78.9},{"m":13,"p3":70.3,"p15":72.5,"p50":75.2,"p85":77.9,"p97":80.2},{"m":14,"p3":71.3,"p15":73.6,"p50":76.4,"p85":79.2,"p97":81.4},{"m":15,"p3":72.4,"p15":74.7,"p50":77.5,"p85":80.3,"p97":82.7},{"m":16,"p3":73.3,"p15":75.7,"p50":78.6,"p85":81.5,"p97":83.9},{"m":17,"p3":74.3,"p15":76.7,"p50":79.7,"p85":82.6,"p97":85},{"m":18,"p3":75.2,"p15":77.7,"p50":80.7,"p85":83.7,"p97":86.2},{"m":19,"p3":76.2,"p15":78.7,"p50":81.7,"p85":84.8,"p97":87.3},{"m":20,"p3":77,"p15":79.6,"p50":82.7,"p85":85.8,"p97":88.4},{"m":21,"p3":77.9,"p15":80.5,"p50":83.7,"p85":86.8,"p97":89.4},{"m":22,"p3":78.7,"p15":81.4,"p50":84.6,"p85":87.8,"p97":90.5},{"m":23,"p3":79.6,"p15":82.2,"p50":85.5,"p85":88.8,"p97":91.5},{"m":24,"p3":80.3,"p15":83.1,"p50":86.4,"p85":89.8,"p97":92.5}]},"cn":{"w":[{"m":0,"p3":2.7,"p25":3.1,"p50":3.3,"p75":3.6,"p97":4.1},{"m":1,"p3":3.5,"p25":4.0,"p50":4.3,"p75":4.6,"p97":5.3},{"m":2,"p3":4.4,"p25":5.0,"p50":5.4,"p75":5.8,"p97":6.6},{"m":3,"p3":5.1,"p25":5.8,"p50":6.2,"p75":6.7,"p97":7.6},{"m":4,"p3":5.6,"p25":6.4,"p50":6.9,"p75":7.4,"p97":8.4},{"m":5,"p3":6.0,"p25":6.9,"p50":7.4,"p75":7.9,"p97":9.1},{"m":6,"p3":6.4,"p25":7.2,"p50":7.8,"p75":8.4,"p97":9.6},{"m":7,"p3":6.7,"p25":7.6,"p50":8.1,"p75":8.8,"p97":10.0},{"m":8,"p3":6.9,"p25":7.9,"p50":8.4,"p75":9.1,"p97":10.4},{"m":9,"p3":7.2,"p25":8.1,"p50":8.7,"p75":9.4,"p97":10.8},{"m":10,"p3":7.4,"p25":8.3,"p50":9.0,"p75":9.6,"p97":11.1},{"m":11,"p3":7.6,"p25":8.6,"p50":9.2,"p75":9.9,"p97":11.4},{"m":12,"p3":7.7,"p25":8.8,"p50":9.4,"p75":10.1,"p97":11.6},{"m":15,"p3":8.3,"p25":9.3,"p50":10.0,"p75":10.8,"p97":12.4},{"m":18,"p3":8.8,"p25":9.9,"p50":10.7,"p75":11.5,"p97":13.2},{"m":21,"p3":9.3,"p25":10.5,"p50":11.3,"p75":12.2,"p97":14.0},{"m":24,"p3":9.8,"p25":11.1,"p50":11.9,"p75":12.9,"p97":14.8}],"l":[{"m":0,"p3":46.8,"p25":49.1,"p50":50.3,"p75":51.6,"p97":53.8},{"m":1,"p3":50.4,"p25":52.8,"p50":54.1,"p75":55.4,"p97":57.8},{"m":2,"p3":53.8,"p25":56.3,"p50":57.7,"p75":59.1,"p97":61.6},{"m":3,"p3":56.7,"p25":59.3,"p50":60.8,"p75":62.2,"p97":64.8},{"m":4,"p3":59.1,"p25":61.7,"p50":63.3,"p75":64.8,"p97":67.4},{"m":5,"p3":61.0,"p25":63.8,"p50":65.3,"p75":66.9,"p97":69.6},{"m":6,"p3":62.7,"p25":65.5,"p50":67.1,"p75":68.7,"p97":71.5},{"m":7,"p3":64.2,"p25":67.1,"p50":68.7,"p75":70.3,"p97":73.1},{"m":8,"p3":65.6,"p25":68.5,"p50":70.1,"p75":71.7,"p97":74.7},{"m":9,"p3":66.8,"p25":69.8,"p50":71.5,"p75":73.1,"p97":76.1},{"m":10,"p3":68.1,"p25":71.1,"p50":72.8,"p75":74.5,"p97":77.5},{"m":11,"p3":69.2,"p25":72.3,"p50":74.0,"p75":75.7,"p97":78.8},{"m":12,"p3":70.4,"p25":73.5,"p50":75.2,"p75":77.0,"p97":80.1},{"m":15,"p3":73.5,"p25":76.8,"p50":78.6,"p75":80.5,"p97":83.8},{"m":18,"p3":76.5,"p25":79.9,"p50":81.9,"p75":83.8,"p97":87.2},{"m":21,"p3":79.3,"p25":82.9,"p50":84.9,"p75":86.9,"p97":90.4},{"m":24,"p3":81.2,"p25":84.9,"p50":87.0,"p75":89.1,"p97":92.8}]}};
+var K_GROW='bf_growth_v1', K_BIRTH='bf_birth_v1';
+var growth=[], birth=null;
+
 /* 本地存储容错：某些环境（无痕模式 / 第三方 iframe / 部分内置浏览器）
    写入 localStorage 会直接抛异常，必须包起来，否则会中断后续 UI 逻辑 */
 var LS_OK=true;
@@ -479,7 +617,13 @@ function load(){
   try{active=JSON.parse(lsGet(K_ACT)||'null');}catch(e){active=null;}
   if(active&&!active.start)active=null;
   lastSide=lsGet(K_LAST)||null;
+  try{growth=JSON.parse(lsGet(K_GROW)||'[]');}catch(e){growth=[];}
+  if(!Array.isArray(growth))growth=[];
+  growth=growth.filter(function(g){return g&&g.date&&(g.w||g.h);});
+  try{birth=JSON.parse(lsGet(K_BIRTH)||'null');}catch(e){birth=null;}
 }
+function persistGrow(){lsSet(K_GROW,JSON.stringify(growth));}
+function persistBirth(){lsSet(K_BIRTH,JSON.stringify(birth));}
 function save(){lsSet(K_REC,JSON.stringify(records));}
 function saveActive(){if(active)lsSet(K_ACT,JSON.stringify(active));else lsDel(K_ACT);}
 function pad(n){return n<10?'0'+n:''+n;}
@@ -937,12 +1081,299 @@ function closeAll(){
 function go(p){
   document.getElementById('page-record').classList.toggle('active',p==='record');
   document.getElementById('page-cal').classList.toggle('active',p==='cal');
+  document.getElementById('page-grow').classList.toggle('active',p==='grow');
   document.getElementById('tabRecord').classList.toggle('on',p==='record');
   document.getElementById('tabCal').classList.toggle('on',p==='cal');
+  document.getElementById('tabGrow').classList.toggle('on',p==='grow');
   if(p==='cal')renderCal();
+  if(p==='grow'){
+    renderGrow();
+    if(!birth&&!growth.length&&!lsGet('bf_grow_onboard')){lsSet('bf_grow_onboard','1');setTimeout(editBirth,350);}
+  }
   window.scrollTo(0,0);
 }
 function setAmount(v){document.getElementById('bottleAmount').value=v;}
+
+/* ================= 生长：记录 / 曲线 / 百分位 ================= */
+var growState={std:'who', idx:'w', rng:6};
+function openGrow(){
+  document.getElementById('gDate').value=dstr(new Date());
+  document.getElementById('gW').value='';
+  document.getElementById('gH').value='';
+  document.getElementById('gNote').value='';
+  show('maskGrow');
+}
+function saveGrow(){
+  var d=document.getElementById('gDate').value;
+  if(!d){toast('请选择日期');return;}
+  var w=parseFloat(document.getElementById('gW').value);
+  var h=parseFloat(document.getElementById('gH').value);
+  if((isNaN(w)||w<=0)&&(isNaN(h)||h<=0)){toast('体重和身长至少填一项');return;}
+  if(!isNaN(w)&&w>0&&w<1){toast('体重单位是 kg，例如 4.85');return;}
+  var rec={id:uid(),date:d,w:(!isNaN(w)&&w>0)?w:null,h:(!isNaN(h)&&h>0)?h:null,
+    note:document.getElementById('gNote').value};
+  // 一天一条：覆盖当天
+  for(var i=0;i<growth.length;i++){
+    if(growth[i].date===d){rec.id=growth[i].id;growth[i]=rec;break;}
+  }
+  if(i>=growth.length)growth.push(rec);
+  growth.sort(function(a,b){return a.date<b.date?-1:1;});
+  persistGrow();closeAll();renderGrow();toast('已保存'+(rec.w!=null?'体重 '+rec.w+'kg':'身长 '+rec.h+'cm'));
+}
+function delGrow(id){
+  if(!confirm('删除这条生长记录？'))return;
+  growth=growth.filter(function(g){return g.id!==id;});
+  persistGrow();renderGrow();toast('已删除');
+}
+function editBirth(){
+  document.getElementById('bDate').value=birth&&birth.date?birth.date:'';
+  document.getElementById('bW').value=birth&&birth.w?birth.w:'';
+  document.getElementById('bH').value=birth&&birth.h?birth.h:'';
+  show('maskBirth');
+}
+function saveBirth(){
+  var d=document.getElementById('bDate').value;
+  if(!d){toast('请填写出生日期');return;}
+  var w=parseFloat(document.getElementById('bW').value);
+  var h=parseFloat(document.getElementById('bH').value);
+  birth={date:d,w:(!isNaN(w)&&w>0)?w:null,h:(!isNaN(h)&&h>0)?h:null};
+  persistBirth();closeAll();renderGrow();toast('出生信息已保存');
+}
+/* 月龄：天数/30.4375 */
+function ageMonths(dateStr){
+  if(!birth||!birth.date)return null;
+  var b=new Date(birth.date+'T00:00:00');
+  var d=new Date(dateStr+'T00:00:00');
+  if(isNaN(b.getTime())||isNaN(d.getTime()))return null;
+  return (d-b)/(30.4375*86400000);
+}
+function fmtAge(m){
+  if(m<0)return '未出生';
+  if(m<1)return Math.max(0,Math.round(m*30.4375))+'天';
+  if(m<24)return (Math.round(m*10)/10)+'月';
+  return (Math.floor(m/12))+'岁'+Math.round(m%12)+'月';
+}
+/* 标准值插值：返回月龄 m 处各百分位数值 */
+function refAt(std,idx,m){
+  var arr=REF[std][idx];
+  if(m<=arr[0].m)return arr[0];
+  if(m>=arr[arr.length-1].m)return arr[arr.length-1];
+  for(var i=1;i<arr.length;i++){
+    if(arr[i].m>=m){
+      var a=arr[i-1],b=arr[i],t=(m-a.m)/(b.m-a.m),o={m:m};
+      ['p3','p25','p50','p75','p15','p85','p97'].forEach(function(k){
+        if(a[k]!=null&&b[k]!=null)o[k]=a[k]+(b[k]-a[k])*t;
+      });
+      return o;
+    }
+  }
+  return arr[arr.length-1];
+}
+/* 百分位落点结论 */
+function percentileText(std,idx,ageM,val){
+  if(val==null)return '';
+  var r=refAt(std,idx,ageM);
+  var L=[];
+  if(std==='who'){L=[['p3','P3'],['p15','P15'],['p50','P50'],['p85','P85'],['p97','P97']];}
+  else{L=[['p3','P3'],['p25','P25'],['p50','P50'],['p75','P75'],['p97','P97']];}
+  if(val<=r[L[0][0]])return '低于 '+L[0][1]+'（建议咨询儿保医生）';
+  for(var i=1;i<L.length;i++){
+    if(val<=r[L[i][0]])return L[i-1][1]+' ~ '+L[i][1]+' 之间';
+  }
+  return '高于 '+L[L.length-1][1];
+}
+function setStd(s){growState.std=s;renderGrow();}
+function setIdx(i){growState.idx=i;renderGrow();}
+function setRng(r){growState.rng=r;renderGrow();}
+
+function renderGrow(){
+  // 出生信息卡
+  var bt=document.getElementById('birthTitle'),bb=document.getElementById('birthBody');
+  if(birth&&birth.date){
+    bt.textContent='出生信息 · '+birth.date;
+    bb.textContent='出生体重 '+(birth.w||'—')+'kg'+(birth.h?' · 出生身长 '+birth.h+'cm':'');
+  }else{
+    bt.textContent='出生信息（点我填写）';
+    bb.textContent='填了出生日期和体重，曲线才有起点和月龄';
+  }
+  // 统计
+  var lastW=null,lastH=null,prevW=null;
+  for(var i=growth.length-1;i>=0;i--){
+    if(lastW==null&&growth[i].w!=null){lastW=growth[i];
+      for(var j=i-1;j>=0;j--){if(growth[j].w!=null){prevW=growth[j];break;}}
+    }
+    if(lastH==null&&growth[i].h!=null)lastH=growth[i];
+    if(lastW&&lastH)break;
+  }
+  document.getElementById('gsW').textContent=lastW?lastW.w:'--';
+  document.getElementById('gsH').textContent=lastH?lastH.h:'--';
+  var rate='';
+  if(lastW&&prevW){
+    var days=(new Date(lastW.date)-new Date(prevW.date))/86400000;
+    if(days>=1)rate=Math.round((lastW.w-prevW.w)*1000/days);
+  }else if(lastW&&birth&&birth.w){
+    var days0=(new Date(lastW.date)-new Date(birth.date))/86400000;
+    if(days0>=1)rate=Math.round((lastW.w-birth.w)*1000/days0);
+  }
+  document.getElementById('gsRate').textContent=(rate!==''&&rate>=0)?'+'+rate:(rate<0?rate:'--');
+  // 记录列表
+  var list=growth.slice().reverse();
+  document.getElementById('growCount').textContent=list.length?('共 '+list.length+' 条'):'';
+  var box=document.getElementById('growList');
+  if(!list.length){box.innerHTML='<div class="empty">还没有记录，点上面的按钮记第一笔</div>';}
+  else{
+    box.innerHTML=list.slice(0,30).map(function(g){
+      var a=ageMonths(g.date);
+      return '<div class="grow-row"><div><div class="gr-date">'+g.date.slice(5)+'</div>'+
+        '<div class="gr-age">'+(a!=null?fmtAge(a):'')+'</div></div>'+
+        '<div class="gr-val">'+(g.w!=null?'<b>'+g.w+'</b> kg':'')+
+        (g.w!=null&&g.h!=null?' · ':'')+(g.h!=null?'<span class="h">'+g.h+'</span> cm':'')+
+        (g.note?'<div class="gr-age">'+g.note+'</div>':'')+'</div>'+
+        '<button class="rec-del" onclick="delGrow(\''+g.id+'\')">×</button></div>';
+    }).join('');
+  }
+  // chips 状态
+  document.getElementById('stdWho').classList.toggle('on',growState.std==='who');
+  document.getElementById('stdCn').classList.toggle('on',growState.std==='cn');
+  document.getElementById('idxW').classList.toggle('on',growState.idx==='w');
+  document.getElementById('idxH').classList.toggle('on',growState.idx==='l');
+  document.getElementById('rng6').classList.toggle('on',growState.rng===6);
+  document.getElementById('rng24').classList.toggle('on',growState.rng===24);
+  document.getElementById('stdNote').textContent=growState.std==='who'?
+    '参考：WHO 儿童生长标准（2006），女童，逐月百分位。':
+    '参考：中国卫生行业标准 WS/T 423-2022《7岁以下儿童生长标准》，女童表5/表6。';
+  drawGrowChart();
+}
+/* 宝宝数据序列：出生点(月龄0) + 各记录点 */
+function babySeries(idx){
+  var k=idx==='w'?'w':'h';
+  var pts=[];
+  if(birth&&birth.date&&birth[k]!=null){
+    pts.push({m:0,v:birth[k],d:birth.date,isBirth:true});
+  }
+  growth.forEach(function(g){
+    if(g[k]==null)return;
+    var a=ageMonths(g.date);
+    if(a==null||a<0)return;
+    pts.push({m:a,v:g[k],d:g.date});
+  });
+  return pts;
+}
+function drawGrowChart(){
+  var cv=document.getElementById('growChart');
+  var cssW=cv.parentNode.clientWidth||320, cssH=250;
+  var st=growState, R=st.rng;
+  var arr=REF[st.std][st.idx];
+  var pts=babySeries(st.idx);
+  var inR=pts.filter(function(p){return p.m<=R;});
+  var note=document.getElementById('growNote');
+  // 文字结论不依赖 canvas，先算好（canvas 不可用时也显示）
+  if(!inR.length){
+    note.innerHTML='还没有可画的数据。'+(birth&&birth.date?'':'先填出生信息，再记一笔体重。');
+  }else{
+    var lastP=inR[inR.length-1];
+    var pTxt=percentileText(st.std,st.idx,lastP.m,lastP.v);
+    var mName=st.idx==='w'?'体重':'身长';
+    note.innerHTML='最新'+mName+' <b>'+lastP.v+(st.idx==='w'?'kg':'cm')+'</b>（'+lastP.d+'，'+fmtAge(lastP.m)+'），'+
+      '按 '+(st.std==='who'?'WHO':'中国 2022')+' 标准位于 <b>'+pTxt+'</b>。'+
+      '只要沿着自己的线稳定往上走就是好趋势，单次偏低偏高不用焦虑。';
+  }
+  var dpr=Math.min(window.devicePixelRatio||1,3);
+  cv.width=cssW*dpr;cv.height=cssH*dpr;
+  var ctx=null;
+  try{ctx=cv.getContext('2d');}catch(e){ctx=null;}
+  if(!ctx)return;   // 环境不支持 canvas 时只显示文字结论，不中断页面
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,cssW,cssH);
+  // y 范围
+  var ymin=1e9,ymax=-1e9;
+  for(var i=0;i<arr.length;i++){
+    if(arr[i].m>R)break;
+    ymin=Math.min(ymin,arr[i].p3);ymax=Math.max(ymax,arr[i].p97);
+  }
+  inR.forEach(function(p){ymin=Math.min(ymin,p.v);ymax=Math.max(ymax,p.v);});
+  if(!inR.length&&ymin>ymin+1){/*空数据无范围*/}
+  if(ymin===1e9){ymin=0;ymax=1;}
+  var pad=(ymax-ymin)*0.08||0.5;ymin-=pad;ymax+=pad;
+  var L=40,T=12,Bm=20,W=cssW-8,H=cssH-T-Bm;
+  function X(m){return L+(m/R)*(W-L);}
+  function Y(v){return T+H-((v-ymin)/(ymax-ymin))*H;}
+  // x 网格
+  ctx.strokeStyle='#F0E8E3';ctx.fillStyle='#9A908B';ctx.lineWidth=1;
+  ctx.font='10px sans-serif';ctx.textAlign='center';
+  var step=R<=6?1:3;
+  for(var m=0;m<=R;m+=step){
+    ctx.beginPath();ctx.moveTo(X(m)+.5,T);ctx.lineTo(X(m)+.5,T+H);ctx.stroke();
+    ctx.fillText(m+'月',X(m),cssH-6);
+  }
+  // y 网格
+  ctx.textAlign='right';
+  var span=ymax-ymin,ystep=span>18?5:(span>9?2:(span>4?1:0.5));
+  for(var v=Math.ceil(ymin/ystep)*ystep;v<=ymax;v+=ystep){
+    ctx.beginPath();ctx.moveTo(L,Y(v)+.5);ctx.lineTo(cssW-8,Y(v)+.5);ctx.stroke();
+    ctx.fillText((st.idx==='w'?v:v.toFixed(0)),L-5,Y(v)+3);
+  }
+  // P3-P97 带
+  function band(lo,hi,fill){
+    ctx.beginPath();
+    arr.forEach(function(a,i){if(a.m>R)return;i?ctx.lineTo(X(a.m),Y(a[hi])):ctx.moveTo(X(a.m),Y(a[hi]));});
+    for(var j=arr.length-1;j>=0;j--){if(arr[j].m>R)continue;ctx.lineTo(X(arr[j].m),Y(arr[j][lo]));}
+    ctx.closePath();ctx.fillStyle=fill;ctx.fill();
+  }
+  band('p3','p97','rgba(200,190,183,.16)');
+  if(st.std==='who')band('p15','p85','rgba(200,190,183,.22)');
+  else band('p25','p75','rgba(200,190,183,.22)');
+  // P3/P97/P50 线
+  ['p3','p50','p97'].forEach(function(k){
+    ctx.beginPath();ctx.setLineDash(k==='p50'?[4,3]:[]);
+    arr.forEach(function(a,i){if(a.m>R)return;i?ctx.lineTo(X(a.m),Y(a[k])):ctx.moveTo(X(a.m),Y(a[k]));});
+    ctx.strokeStyle='#C9BEB8';ctx.lineWidth=1;ctx.stroke();ctx.setLineDash([]);
+  });
+  if(!inR.length)return;
+  // 宝宝曲线
+  ctx.beginPath();
+  inR.forEach(function(p,i){i?ctx.lineTo(X(p.m),Y(p.v)):ctx.moveTo(X(p.m),Y(p.v));});
+  ctx.strokeStyle='#F2729B';ctx.lineWidth=2.2;ctx.lineJoin='round';ctx.stroke();
+  inR.forEach(function(p){
+    ctx.beginPath();ctx.arc(X(p.m),Y(p.v),3.2,0,6.2832);
+    ctx.fillStyle='#F2729B';ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.stroke();
+  });
+  // 最新点数值标签
+  var lp=inR[inR.length-1];
+  var label=(st.idx==='w'?lp.v+'kg':lp.v+'cm');
+  ctx.font='bold 11px sans-serif';
+  var tw=ctx.measureText(label).width;
+  var lx=Math.min(Math.max(X(lp.m)-tw/2,4),cssW-10-tw), ly=Y(lp.v)-9;
+  if(ly<12)ly=Y(lp.v)+16;
+  ctx.fillStyle='#F2729B';ctx.fillText(label,lx+tw/2,ly);
+}
+function exportGrowthCSV(){
+  if(!growth.length){toast('还没有生长记录');return;}
+  var head=['日期','月龄(约)','体重(kg)','身长(cm)','备注'];
+  var rows=[head];
+  growth.forEach(function(g){
+    var a=ageMonths(g.date);
+    rows.push([g.date,a!=null?(Math.round(a*100)/100):'',g.w||'',g.h||'',g.note||'']);
+  });
+  var csv='\ufeff'+rows.map(function(r){
+    return r.map(function(v){v=''+v;return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(',');
+  }).join('\r\n');
+  var fn='生长记录_'+dstr(new Date())+'.csv';
+  if(nativeExport(csv,fn,false)){toast('已保存到「下载」目录');return;}
+  try{
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=fn;a.rel='noopener';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},1500);
+    toast('已导出生长记录');
+  }catch(e){showTextArea(fn,csv);}
+}
+window.addEventListener('resize',function(){
+  if(document.getElementById('page-grow').classList.contains('active'))drawGrowChart();
+});
 
 /* 诊断：长按「导出」这个标题 3 秒，弹出运行环境信息，方便排查导出为什么没反应 */
 function bindDiag(){
