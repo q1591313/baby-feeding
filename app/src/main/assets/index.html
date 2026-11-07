@@ -342,13 +342,17 @@ header{
   </div>
 
   <div class="card">
-    <div class="card-title"><span id="exportHead">导出</span></div>
+    <div class="card-title"><span id="exportHead">数据</span></div>
     <div style="font-size:12px;color:var(--muted);margin:6px 0 12px;">
-      把所有记录导出为 CSV 表格，可用 Excel / WPS /  Numbers 打开，也可直接分享到微信。
+      CSV 可用 Excel / WPS 打开。重装、换手机前请先做一次「完整备份」，装好后再「恢复数据」。
     </div>
     <div class="sheet-btns" style="margin-top:0">
       <button class="btn primary" onclick="exportCSV()">导出 CSV</button>
       <button class="btn" onclick="shareCSV()">分享到微信</button>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn" onclick="exportBackup()">完整备份</button>
+      <button class="btn" onclick="openRestore()">恢复数据</button>
     </div>
   </div>
 </div>
@@ -576,6 +580,26 @@ header{
     <div class="sheet-btns">
       <button class="btn" onclick="closeAll()">取消</button>
       <button class="btn primary" onclick="saveBirth()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="mask" id="maskRestore" onclick="if(event.target===this)closeAll()">
+  <div class="sheet">
+    <h3>恢复数据</h3>
+    <div class="sub">选备份文件（.json / .csv），或直接把内容粘进来。导入与现有记录合并，重复的自动跳过。</div>
+    <input type="file" id="restoreFile" accept=".json,.csv,.txt,text/csv,application/json,text/plain" style="display:none" onchange="readRestoreFile(this)">
+    <div class="sheet-btns" style="margin-top:0">
+      <button class="btn" onclick="document.getElementById('restoreFile').click()">选择备份文件</button>
+    </div>
+    <div class="field">
+      <label>或粘贴内容</label>
+      <textarea id="restoreText" rows="4" placeholder="粘贴备份里的内容…"
+        style="width:100%;box-sizing:border-box;border:1px solid #EFE3DC;border-radius:14px;padding:12px;font-size:13px;line-height:1.5;font-family:inherit;resize:vertical;background:#fff;color:#2C2622;"></textarea>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn" onclick="closeAll()">取消</button>
+      <button class="btn primary" onclick="doRestoreText()">开始恢复</button>
     </div>
   </div>
 </div>
@@ -1069,6 +1093,162 @@ function showTextArea(fn,csv){
   var ta=box.querySelector('textarea');
   ta.value=csv;
   ta.focus();
+}
+
+/* ================= 完整备份 / 恢复 ================= */
+function buildBackup(){
+  return JSON.stringify({
+    app:'baby-feeding', v:1, exported:Date.now(),
+    records:records.slice().sort(function(a,b){return a.start-b.start;}),
+    growth:growth, birth:birth, lastSide:lastSide
+  });
+}
+function exportBackup(){
+  if(!records.length&&!growth.length){toast('还没有数据可备份');return;}
+  var fn='喂奶记录备份_'+dstr(new Date())+'.json';
+  var txt=buildBackup();
+  if(nativeExport(txt,fn,false)){toast('备份已存到「下载」目录');return;}
+  try{
+    var blob=new Blob([txt],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},1500);
+    toast('备份已导出');
+  }catch(e){showTextArea(fn,txt);}
+}
+function openRestore(){
+  var ta=document.getElementById('restoreText');
+  if(ta)ta.value='';
+  show('maskRestore');
+}
+function readRestoreFile(input){
+  var f=input.files&&input.files[0];
+  if(!f){return;}
+  try{
+    var rd=new FileReader();
+    rd.onload=function(){
+      document.getElementById('restoreText').value=String(rd.result||'');
+      toast('已读取 '+f.name+'，点「开始恢复」');
+    };
+    rd.onerror=function(){toast('读不了这个文件，改用粘贴方式');};
+    rd.readAsText(f,'UTF-8');
+  }catch(e){toast('读不了这个文件，改用粘贴方式');}
+  input.value='';
+}
+function doRestoreText(){
+  var t=document.getElementById('restoreText').value;
+  if(!t||!t.trim()){toast('还没有内容');return;}
+  var res;
+  try{res=parseBackup(t);}catch(e){toast('内容识别失败：'+(e.message||e));return;}
+  if(!res.n&&!res.g){toast('没解析到记录，检查是不是选错了文件');return;}
+  save();persistGrow();persistBirth();
+  closeAll();renderAll();renderCal();renderGrow();
+  toast('已恢复 '+res.n+' 条记录'+(res.g?('、'+res.g+' 条生长'):'')+(res.skip?('，跳过 '+res.skip+' 条重复'):''));
+}
+function parseCSVLine(line){
+  var out=[],cur='',q=false;
+  for(var i=0;i<line.length;i++){
+    var ch=line.charAt(i);
+    if(q){
+      if(ch==='"'){ if(line.charAt(i+1)==='"'){cur+='"';i++;} else {q=false;} }
+      else {cur+=ch;}
+    }else{
+      if(ch==='"'){q=true;}
+      else if(ch===','){out.push(cur);cur='';}
+      else {cur+=ch;}
+    }
+  }
+  out.push(cur);
+  return out;
+}
+var NAME2TYPE={'亲喂':'breast','吸奶':'pump','瓶喂':'bottle','大便':'poop'};
+function parseDT(s){
+  s=(''+(s||'')).trim();
+  var m=s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if(!m)return null;
+  var d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));
+  var t=d.getTime();
+  return isNaN(t)?null:t;
+}
+function csvRowToRec(c){
+  var type=NAME2TYPE[(''+(c[0]||'')).trim()];
+  if(!type)return null;
+  var st=parseDT(c[1]);
+  if(st==null)return null;
+  var et=parseDT(c[2]);
+  var dur=null;
+  if(et!=null){dur=Math.max(0,Math.round((et-st)/1000));}
+  else{
+    var mm=parseFloat(c[3]);
+    if(!isNaN(mm)&&mm>0)dur=Math.round(mm*60);
+  }
+  var side=null;
+  if(type==='breast'||type==='pump'){
+    var sd=(''+(c[4]||'')).trim();
+    side=sd==='左侧'?'left':sd==='右侧'?'right':sd==='双侧'?'both':null;
+  }
+  var amt=null;
+  if(type==='bottle'){
+    var a=parseInt(c[5],10);
+    if(!isNaN(a)&&a>0)amt=a;
+  }
+  return {
+    id:uid(),type:type,side:side,amount:amt,
+    start:st,end:et,dur:dur,
+    poopState:(type==='poop'?(((''+(c[6]||'')).trim())||null):null),
+    poopColor:(type==='poop'?(((''+(c[7]||'')).trim())||null):null),
+    note:(''+(c[8]||'')).trim()
+  };
+}
+function mergeRec(r){
+  if(!r||!r.type||r.start==null)return false;
+  for(var i=0;i<records.length;i++){
+    var x=records[i];
+    if(x.type===r.type&&Math.abs(x.start-r.start)<60000)return false;
+  }
+  records.push(r);
+  return true;
+}
+/* 备份内容解析：JSON（完整备份）或 CSV（旧版本导出的表格）都能吃 */
+function parseBackup(txt){
+  var s=txt.replace(/^\uFEFF/,'').trim();
+  var n=0,g=0,skip=0;
+  if(s.charAt(0)==='{'||s.charAt(0)==='['){
+    var d=JSON.parse(s);
+    if(Object.prototype.toString.call(d)==='[object Array]')d={records:d};
+    (d.records||[]).forEach(function(r){
+      if(mergeRec({
+        id:r.id||uid(),type:r.type,side:r.side||null,amount:(r.amount!=null?r.amount:null),
+        start:r.start,end:(r.end!=null?r.end:null),dur:(r.dur!=null?r.dur:null),
+        poopState:r.poopState||null,poopColor:r.poopColor||null,note:r.note||''
+      }))n++;else skip++;
+    });
+    (d.growth||[]).forEach(function(x){
+      if(!x||!x.date)return;
+      for(var i=0;i<growth.length;i++)if(growth[i].date===x.date)return;
+      growth.push({id:x.id||uid(),date:x.date,
+        w:(x.w!=null?x.w:null),h:(x.h!=null?x.h:null),note:x.note||''});
+      g++;
+    });
+    growth.sort(function(a,b){return a.date<b.date?-1:1;});
+    if(d.birth&&d.birth.date&&!birth){birth=d.birth;}
+    if(d.lastSide&&!lastSide){lastSide=d.lastSide;lsSet(K_LAST,lastSide);}
+    return {n:n,g:g,skip:skip};
+  }
+  var lines=s.split(/\r?\n/);
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i];
+    if(!line||!line.trim())continue;
+    var cols=parseCSVLine(line);
+    if(!cols||cols.length<2)continue;
+    if((''+cols[0]).replace(/^\uFEFF/,'').trim()==='类型')continue;
+    var rec=csvRowToRec(cols);
+    if(!rec)continue;
+    if(mergeRec(rec))n++;else skip++;
+  }
+  records.sort(function(a,b){return a.start-b.start;});
+  return {n:n,g:g,skip:skip};
 }
 
 /* ================= 弹层 / 导航 ================= */
