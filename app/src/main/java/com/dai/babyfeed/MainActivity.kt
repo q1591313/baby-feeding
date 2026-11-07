@@ -1,16 +1,19 @@
 package com.dai.babyfeed
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebViewAssetLoader
 
@@ -25,6 +28,22 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bridge: Bridge
     private var pageLoaded = false
     private var pendingJs: String? = null
+
+    /** 网页里 <input type="file"> 触发的系统文件选择器（用于「恢复数据」选备份文件） */
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private val fileChooser = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val cb = filePathCallback
+        filePathCallback = null
+        try {
+            cb?.onReceiveValue(
+                WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
+            )
+        } catch (e: Exception) {
+            cb?.onReceiveValue(null)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,6 +108,23 @@ class MainActivity : AppCompatActivity() {
             override fun onConsoleMessage(msg: ConsoleMessage): Boolean {
                 Log.d(TAG, "JS: ${msg.message()} @${msg.lineNumber()}")
                 return true
+            }
+
+            override fun onShowFileChooser(
+                view: WebView?,
+                callback: ValueCallback<Array<Uri>>?,
+                params: FileChooserParams?
+            ): Boolean {
+                filePathCallback?.onReceiveValue(null)
+                filePathCallback = callback
+                return try {
+                    fileChooser.launch(params!!.createIntent())
+                    true
+                } catch (e: Exception) {
+                    Log.w(TAG, "文件选择器打不开: ${e.message}")
+                    filePathCallback = null
+                    false
+                }
             }
         }
 
