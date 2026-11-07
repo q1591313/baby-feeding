@@ -58,11 +58,20 @@ class Bridge(private val ctx: Context) {
         return saveToDownloads(content, filename) != null
     }
 
+    private fun mimeOf(filename: String): String {
+        val n = filename.lowercase()
+        return when {
+            n.endsWith(".json") -> "application/json"
+            n.endsWith(".txt") -> "text/plain"
+            else -> "text/csv"
+        }
+    }
+
     private fun saveToDownloads(content: String, filename: String): Uri? {
         return try {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, filename)
-                put(MediaStore.Downloads.MIME_TYPE, "text/csv")
+                put(MediaStore.Downloads.MIME_TYPE, mimeOf(filename))
                 put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                 put(MediaStore.Downloads.IS_PENDING, 1)
             }
@@ -82,8 +91,7 @@ class Bridge(private val ctx: Context) {
     }
 
     /** 必须切回主线程才能弹 Toast / 分享 */
-    private fun toast(msg: String) {
-        val act = ctx as? MainActivity
+    private fun toast(msg: String) {        val act = ctx as? MainActivity
         if (act != null) {
             act.runOnUiThread { Toast.makeText(act, msg, Toast.LENGTH_LONG).show() }
         }
