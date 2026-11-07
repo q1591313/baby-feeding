@@ -113,7 +113,7 @@ class MainActivity : AppCompatActivity() {
             override fun onShowFileChooser(
                 view: WebView?,
                 callback: ValueCallback<Array<Uri>>?,
-                params: FileChooserParams?
+                params: WebChromeClient.FileChooserParams?
             ): Boolean {
                 filePathCallback?.onReceiveValue(null)
                 filePathCallback = callback
