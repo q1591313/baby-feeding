@@ -67,7 +67,9 @@ class MainActivity : AppCompatActivity() {
         s.textZoom = 100
         s.mediaPlaybackRequiresUserGesture = true
         s.allowFileAccess = false
-        s.allowContentAccess = false
+        // 必须允许 content:// ：系统文件选择器交回来的是 content URI，
+        // 关掉会导致「选得到文件但读不出内容」。页面是本地资产，没有外部来源。
+        s.allowContentAccess = true
 
         bridge = Bridge(this)
         web.addJavascriptInterface(bridge, "Android")
@@ -118,7 +120,15 @@ class MainActivity : AppCompatActivity() {
                 filePathCallback?.onReceiveValue(null)
                 filePathCallback = callback
                 return try {
-                    fileChooser.launch(params!!.createIntent())
+                    // 不用 params.createIntent()：它会照搬网页 accept 里的 MIME 白名单，
+                    // 而各家 ROM 对 .csv 的 MIME 认定不一致（text/csv、text/comma-separated-values、
+                    // application/vnd.ms-excel 都有），按 MIME 过滤会把备份文件直接藏起来。
+                    // 这里放开成「所有文件」，格式由内容自动识别（JSON 看首字符、CSV 看表头）。
+                    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                    }
+                    fileChooser.launch(intent)
                     true
                 } catch (e: Exception) {
                     Log.w(TAG, "文件选择器打不开: ${e.message}")
