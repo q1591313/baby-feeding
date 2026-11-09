@@ -370,7 +370,7 @@ header{
   <div class="card" style="padding:10px 0;">
     <div class="grow-stat">
       <div class="ov-item"><div class="ov-num pink" id="gsW">--</div><div class="ov-label">当前体重 kg</div></div>
-      <div class="ov-item"><div class="ov-num purple" id="gsRate">--</div><div class="ov-label">日增重 g/天</div></div>
+      <div class="ov-item"><div class="ov-num purple" id="gsRate">--</div><div class="ov-label" id="gsRateLabel">较上次 g</div></div>
       <div class="ov-item"><div class="ov-num blue" id="gsH">--</div><div class="ov-label">当前身长 cm</div></div>
     </div>
   </div>
@@ -489,7 +489,7 @@ header{
   <div class="sheet">
     <div class="sheet-scroll">
       <h3>手动补录</h3>
-      <div class="sub">忘了按时记？在这里补上</div>
+      <div class="sub">一般是忘了点开始：结束时间已填好当前时间，开始时间能想起来就填、想不起来就留空</div>
       <div class="field">
         <label>类型</label>
         <div class="chips" id="mType"></div>
@@ -513,11 +513,11 @@ header{
         <div class="chips" id="mPoopColor"></div>
       </div>
       <div class="field">
-        <label>开始时间</label>
+        <label>开始时间（选填，留空 = 与结束时间相同）</label>
         <input type="datetime-local" id="mStart">
       </div>
       <div class="field" id="mEndField">
-        <label>结束时间（可留空）</label>
+        <label>结束时间</label>
         <input type="datetime-local" id="mEnd">
       </div>
       <div class="field">
@@ -757,13 +757,20 @@ function startActive(type,side,amount){
 }
 function endActive(){
   if(!active)return;
-  var dur=Math.round((Date.now()-active.start)/1000);
+  var endTs=Date.now();
+  var dur=Math.round((endTs-active.start)/1000);
   if(dur<0)dur=0;
+  var capped=false;
+  /* 亲喂/吸奶固定 30 分钟封顶：忘了结束时也只按 30 分钟入库，不会记成几小时 */
+  if((active.type==='breast'||active.type==='pump')&&dur>1800){
+    dur=1800;endTs=active.start+1800000;capped=true;
+  }
   records.push({id:active.id,type:active.type,side:active.side,amount:active.amount,
-    start:active.start,end:Date.now(),dur:dur,note:''});
+    start:active.start,end:endTs,dur:dur,note:''});
   var t=active.type,side=active.side;
   active=null;saveActive();save();renderAll();syncNative();
   var msg=TYPE[t].n+'结束 · 时长 '+fmtDurText(dur);
+  if(capped)msg+='\n已满30分钟，按上限自动结束';
   if(t==='breast'){
     var next=side==='left'?'右侧':'左侧';
     msg+='\n下次建议从'+next+'开始';
@@ -797,8 +804,9 @@ function savePoop(){
 var mDraft={type:'breast',side:'left',state:'',color:''};
 function onManual(){
   mDraft={type:'breast',side:'left',state:'',color:''};
-  document.getElementById('mStart').value=localInput(new Date());
-  document.getElementById('mEnd').value='';
+  /* 忘了的多数是"开始"：结束时间默认当前时间，开始时间留空选填 */
+  document.getElementById('mStart').value='';
+  document.getElementById('mEnd').value=localInput(new Date());
   document.getElementById('mAmount').value='';
   document.getElementById('mDur').value='';
   document.getElementById('mNote').value='';
@@ -818,6 +826,9 @@ function refreshManual(){
   document.getElementById('mAmountField').style.display=(t==='bottle')?'':'none';
   document.getElementById('mDurField').style.display=(t==='poop')?'none':'';
   document.getElementById('mEndField').style.display=(t==='poop')?'none':'';
+  if(t==='poop'&&!document.getElementById('mStart').value){
+    document.getElementById('mStart').value=localInput(new Date()); /* 大便没有结束时间，时刻填在开始栏 */
+  }
   document.getElementById('mPoopField').style.display=(t==='poop')?'':'none';
   var chips=document.getElementById('mType').children;
   for(var i=0;i<chips.length;i++){
@@ -828,13 +839,19 @@ function refreshManual(){
 }
 function saveManual(){
   var s=document.getElementById('mStart').value;
-  if(!s){toast('请填写开始时间');return;}
-  var st=new Date(s).getTime();
-  var et=document.getElementById('mEnd').value?new Date(document.getElementById('mEnd').value).getTime():null;
-  var dur=parseInt(document.getElementById('mDur').value,10);
-  if(!dur&&et)dur=Math.round((et-st)/1000);
-  if(!dur)dur=0;
+  var ev=document.getElementById('mEnd').value;
+  var et=ev?new Date(ev).getTime():null;
+  var st=s?new Date(s).getTime():null;
+  if(st==null&&et!=null)st=et;                 /* 开始留空：与结束时间相同，时长以手填为准 */
+  if(st==null&&mDraft.type==='poop')st=Date.now(); /* 大便只记一个时刻 */
+  if(st==null){toast('请至少填写一个时间');return;}
+  if(mDraft.type==='poop')et=null;                 /* 大便只记时刻，不带结束时间 */
   if(et&&et<st){toast('结束时间早于开始时间');return;}
+  var durMin=parseInt(document.getElementById('mDur').value,10);
+  var dur;
+  if(durMin>0)dur=durMin*60;                      /* 输入框是分钟，库里存秒 */
+  else if(et!=null)dur=Math.max(0,Math.round((et-st)/1000));
+  else dur=0;
   var rec={id:uid(),type:mDraft.type,side:(mDraft.type==='breast'||mDraft.type==='pump')?mDraft.side:null,
     amount:mDraft.type==='bottle'?parseInt(document.getElementById('mAmount').value,10)||null:null,
     start:st,end:et,dur:dur,poopState:mDraft.type==='poop'?mDraft.state:null,
@@ -893,7 +910,7 @@ function renderButtons(){
     if(running){
       name.textContent=TYPE[t].n+'结束';
       timer.style.display='';timer.textContent=fmtDur(Math.round((Date.now()-a.start)/1000));
-      if(hint)hint.textContent='点击结束 · 长按丢弃';
+      if(hint)hint.textContent=(t==='bottle')?'点击结束 · 长按丢弃':'点击结束 · 满30分自动结束';
       if(tag){tag.style.display='';tag.textContent=a.side==='both'?'双侧':a.side==='left'?'左侧':'右侧';}
     }else{
       name.textContent=TYPE[t].n;
@@ -1387,15 +1404,15 @@ function renderGrow(){
   }
   document.getElementById('gsW').textContent=lastW?lastW.w:'--';
   document.getElementById('gsH').textContent=lastH?lastH.h:'--';
-  var rate='';
+  /* 较上次增长的克数：只看相邻两笔，不做日均；只有一笔时和出生体重比 */
+  var rate='',rlabel='较上次 g';
   if(lastW&&prevW){
-    var days=(new Date(lastW.date)-new Date(prevW.date))/86400000;
-    if(days>=1)rate=Math.round((lastW.w-prevW.w)*1000/days);
+    rate=Math.round((lastW.w-prevW.w)*1000);
   }else if(lastW&&birth&&birth.w){
-    var days0=(new Date(lastW.date)-new Date(birth.date))/86400000;
-    if(days0>=1)rate=Math.round((lastW.w-birth.w)*1000/days0);
+    rate=Math.round((lastW.w-birth.w)*1000);rlabel='较出生 g';
   }
-  document.getElementById('gsRate').textContent=(rate!==''&&rate>=0)?'+'+rate:(rate<0?rate:'--');
+  document.getElementById('gsRate').textContent=(rate===''||isNaN(rate))?'--':(rate>=0?'+'+rate:''+rate);
+  document.getElementById('gsRateLabel').textContent=rlabel;
   // 记录列表
   var list=growth.slice().reverse();
   document.getElementById('growCount').textContent=list.length?('共 '+list.length+' 条'):'';
@@ -1586,8 +1603,20 @@ load();initCal();renderAll();syncNative();bindDiag();
 ['btnBreast','btnPump','btnBottle'].forEach(function(id){
   bindLongPress(document.getElementById(id),discardActive);
 });
-/* 忘了结束的计时：超过 6 小时自动询问，避免一直挂着 */
-if(active&&Date.now()-active.start>6*3600*1000){
+/* 亲喂/吸奶：到 30 分钟自动结束（页面开着时每秒检查一次） */
+var AUTO_END_MS=30*60000;
+function autoEndIfDue(){
+  if(!active)return false;
+  if((active.type==='breast'||active.type==='pump')&&Date.now()-active.start>=AUTO_END_MS){
+    endActive();return true;
+  }
+  return false;
+}
+/* 忘了结束的计时：亲喂/吸奶到点直接按 30 分钟收尾；瓶喂超过 6 小时再询问 */
+if(active){
+  if(autoEndIfDue()){
+    /* 已自动收尾 */
+  }else if(Date.now()-active.start>6*3600*1000){
   setTimeout(function(){
     if(!active)return;
     if(confirm('有一个「'+TYPE[active.type].n+'」计时已超过 6 小时，应该是忘了结束。\n确定 = 现在结束并保存，取消 = 丢弃不保存')){
@@ -1596,12 +1625,15 @@ if(active&&Date.now()-active.start>6*3600*1000){
       active=null;saveActive();renderAll();toast('已丢弃超时记录');
     }
   },600);
+  }
 }
 setInterval(function(){
-  if(active){renderButtons();renderHeader();}
+  if(!active)return;
+  if(autoEndIfDue())return;
+  renderButtons();renderHeader();
 },1000);
 document.addEventListener('visibilitychange',function(){
-  if(!document.hidden&&active){renderButtons();}
+  if(!document.hidden&&active){if(!autoEndIfDue())renderButtons();}
 });
 </script>
 </body>
